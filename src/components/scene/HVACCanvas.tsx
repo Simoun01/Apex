@@ -333,8 +333,8 @@ function SceneContents({ isSoftwareGl }: { isSoftwareGl: boolean }) {
   // so lowering quality never washes out or brightens the scene.
   const envIntensity = stage === 'experience' ? 0.95 : 0.68;
   const shadowsAllowed = quality !== 'low' && !isSoftwareGl;
-  const shadowSize = quality === 'high' ? 2048 : 512;
-  const shadowRadius = quality === 'high' ? 3.5 : 1.3;
+  const shadowSize = quality === 'high' ? 4096 : quality === 'medium' ? 1024 : 512;
+  const shadowRadius = quality === 'high' ? 5 : 2;
 
   const showExterior = stage === 'home' || stage === 'entering';
   const mountInterior = stage === 'entering' || stage === 'experience';
@@ -415,14 +415,14 @@ export function HVACCanvas() {
           antialias: !isSoftwareGl,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
+          toneMappingExposure: 1.15,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
         style={{ touchAction: stage === 'home' ? 'pan-y' : 'none' }}
         onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.1;
+          gl.toneMappingExposure = 1.15;
           const dom = gl.domElement;
           dom.addEventListener('webglcontextlost', (e) => {
             e.preventDefault();

@@ -111,11 +111,73 @@ function finalizeTexture(
   return tex;
 }
 
+/**
+ * Sobel-filter a greyscale height canvas into a tangent-space normal map.
+ * Wraps at edges so the result tiles seamlessly.
+ */
+export function heightCanvasToNormalMap(
+  heightCanvas: HTMLCanvasElement,
+  strength: number = 2.0,
+  opts?: { repeat?: [number, number]; anisotropy?: number },
+): THREE.CanvasTexture {
+  const w = heightCanvas.width;
+  const h = heightCanvas.height;
+  const srcCtx = heightCanvas.getContext('2d')!;
+  const srcData = srcCtx.getImageData(0, 0, w, h).data;
+
+  const normalCanvas = document.createElement('canvas');
+  normalCanvas.width = w;
+  normalCanvas.height = h;
+  const nctx = normalCanvas.getContext('2d')!;
+  const normalImg = nctx.createImageData(w, h);
+  const nd = normalImg.data;
+
+  const getH = (px: number, py: number) => {
+    const sx = ((px % w) + w) % w;
+    const sy = ((py % h) + h) % h;
+    return srcData[(sy * w + sx) * 4] / 255;
+  };
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const tl = getH(x - 1, y - 1);
+      const t  = getH(x,     y - 1);
+      const tr = getH(x + 1, y - 1);
+      const l  = getH(x - 1, y);
+      const r  = getH(x + 1, y);
+      const bl = getH(x - 1, y + 1);
+      const b  = getH(x,     y + 1);
+      const br = getH(x + 1, y + 1);
+
+      const dx = (tr + 2 * r + br) - (tl + 2 * l + bl);
+      const dy = (bl + 2 * b + br) - (tl + 2 * t + tr);
+
+      const nx = -dx * strength;
+      const ny = -dy * strength;
+      const nz = 1.0;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+
+      const idx = (y * w + x) * 4;
+      nd[idx]     = Math.round(((nx / len) * 0.5 + 0.5) * 255);
+      nd[idx + 1] = Math.round(((ny / len) * 0.5 + 0.5) * 255);
+      nd[idx + 2] = Math.round(((nz / len) * 0.5 + 0.5) * 255);
+      nd[idx + 3] = 255;
+    }
+  }
+
+  nctx.putImageData(normalImg, 0, 0);
+  return finalizeTexture(normalCanvas, {
+    isSRGB: false,
+    repeat: opts?.repeat,
+    anisotropy: opts?.anisotropy ?? 4,
+  });
+}
+
 export function createTileFloorMaps(
   baseHex = '#23334b',
   groutHex = '#0f172a',
   gridCount = 8,
-): { map: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture } {
+): { map: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture; normalMap: THREE.CanvasTexture } {
   const size = 512;
   const albedoCanvas = document.createElement('canvas');
   albedoCanvas.width = size;
@@ -126,6 +188,11 @@ export function createTileFloorMaps(
   roughCanvas.width = size;
   roughCanvas.height = size;
   const rctx = roughCanvas.getContext('2d');
+
+  const heightCanvas = document.createElement('canvas');
+  heightCanvas.width = size;
+  heightCanvas.height = size;
+  const hctx = heightCanvas.getContext('2d');
 
   if (actx && rctx) {
     actx.fillStyle = baseHex;
@@ -183,9 +250,31 @@ export function createTileFloorMaps(
     }
   }
 
+  // Height map for normal map generation: tiles raised, grout recessed
+  if (hctx) {
+    hctx.fillStyle = 'rgb(180, 180, 180)';
+    hctx.fillRect(0, 0, size, size);
+    const hStep = size / gridCount;
+    for (let x = 0; x < gridCount; x++) {
+      for (let y = 0; y < gridCount; y++) {
+        const h = 170 + ((x * 7 + y * 13) % 5) * 4;
+        hctx.fillStyle = `rgb(${h}, ${h}, ${h})`;
+        hctx.fillRect(x * hStep + 4, y * hStep + 4, hStep - 8, hStep - 8);
+      }
+    }
+    hctx.strokeStyle = 'rgb(80, 80, 80)';
+    hctx.lineWidth = 5;
+    for (let i = 0; i <= gridCount; i++) {
+      const p = i * hStep;
+      hctx.beginPath(); hctx.moveTo(p, 0); hctx.lineTo(p, size); hctx.stroke();
+      hctx.beginPath(); hctx.moveTo(0, p); hctx.lineTo(size, p); hctx.stroke();
+    }
+  }
+
   return {
     map: finalizeTexture(albedoCanvas, { isSRGB: true, repeat: [2, 2], anisotropy: 8 }),
     roughnessMap: finalizeTexture(roughCanvas, { isSRGB: false, repeat: [2, 2], anisotropy: 8 }),
+    normalMap: heightCanvasToNormalMap(heightCanvas, 2.5, { repeat: [2, 2], anisotropy: 8 }),
   };
 }
 
@@ -193,6 +282,7 @@ export function createBrushedMetalMaps(): {
   map: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
   bumpMap: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
 } {
   const size = 256;
   const albedo = document.createElement('canvas');
@@ -226,6 +316,7 @@ export function createBrushedMetalMaps(): {
     map: finalizeTexture(albedo, { isSRGB: true, repeat: [2, 2], anisotropy: 4 }),
     roughnessMap: finalizeTexture(rough, { isSRGB: false, repeat: [2, 2], anisotropy: 4 }),
     bumpMap: finalizeTexture(rough, { isSRGB: false, repeat: [2, 2], anisotropy: 4 }),
+    normalMap: heightCanvasToNormalMap(rough, 1.5, { repeat: [2, 2], anisotropy: 4 }),
   };
 }
 

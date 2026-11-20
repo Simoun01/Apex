@@ -367,6 +367,7 @@ export function ExteriorStreetScene() {
       metalMaps.map,
       metalMaps.roughnessMap,
       metalMaps.bumpMap,
+      metalMaps.normalMap,
       woodMaps.map,
       woodMaps.roughnessMap,
       copperMaps.map,
@@ -391,6 +392,7 @@ export function ExteriorStreetScene() {
       metalMaps.map.dispose();
       metalMaps.roughnessMap.dispose();
       metalMaps.bumpMap.dispose();
+      metalMaps.normalMap.dispose();
       woodMaps.map.dispose();
       woodMaps.roughnessMap.dispose();
       copperMaps.map.dispose();

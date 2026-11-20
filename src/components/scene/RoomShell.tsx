@@ -10,6 +10,8 @@ import {
   createWoodGrainMaps,
 } from './hvacSceneUtils';
 
+const _normalScale = new THREE.Vector2(0.38, 0.38);
+
 const _warmColor = new THREE.Color('#F97316');
 const _coolColor = new THREE.Color('#22D3EE');
 const _offColor = new THREE.Color('#FB923C');
@@ -36,8 +38,10 @@ export function RoomShell({ isSoftwareGl = false }: { isSoftwareGl?: boolean }) 
     return () => {
       resFloorMaps.map.dispose();
       resFloorMaps.roughnessMap.dispose();
+      resFloorMaps.normalMap.dispose();
       comFloorMaps.map.dispose();
       comFloorMaps.roughnessMap.dispose();
+      comFloorMaps.normalMap.dispose();
       wallBump.dispose();
       woodMaps.map.dispose();
       woodMaps.roughnessMap.dispose();
@@ -70,8 +74,10 @@ export function RoomShell({ isSoftwareGl = false }: { isSoftwareGl?: boolean }) 
     [
       resFloorMaps.map,
       resFloorMaps.roughnessMap,
+      resFloorMaps.normalMap,
       comFloorMaps.map,
       comFloorMaps.roughnessMap,
+      comFloorMaps.normalMap,
       wallBump,
       woodMaps.map,
       woodMaps.roughnessMap,
@@ -122,11 +128,13 @@ export function RoomShell({ isSoftwareGl = false }: { isSoftwareGl?: boolean }) 
             <meshPhysicalMaterial
               map={resFloorMaps.map}
               roughnessMap={resFloorMaps.roughnessMap}
+              normalMap={resFloorMaps.normalMap}
+              normalScale={_normalScale}
               roughness={0.28}
               metalness={0.08}
               clearcoat={0.48}
               clearcoatRoughness={0.24}
-              envMapIntensity={1.15}
+              envMapIntensity={1.25}
             />
           )}
         </mesh>
@@ -479,10 +487,13 @@ export function RoomShell({ isSoftwareGl = false }: { isSoftwareGl?: boolean }) 
           <meshPhysicalMaterial
             map={comFloorMaps.map}
             roughnessMap={comFloorMaps.roughnessMap}
+            normalMap={comFloorMaps.normalMap}
+            normalScale={_normalScale}
             roughness={0.3}
             metalness={0.12}
             clearcoat={0.45}
             clearcoatRoughness={0.25}
+            envMapIntensity={1.2}
           />
         )}
       </mesh>
