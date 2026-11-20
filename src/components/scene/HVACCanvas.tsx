@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { ContactShadows } from '@react-three/drei';
+import { ContactShadows, PerformanceMonitor } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -375,6 +375,7 @@ export function HVACCanvas() {
   const stage = useHVACStore((s) => s.stage);
   const audience = useHVACStore((s) => s.audience);
   const quality = useHVACStore((s) => s.quality);
+  const setQuality = useHVACStore((s) => s.setQuality);
   const setNon3dMode = useHVACStore((s) => s.setNon3dMode);
   const airflowOn = useHVACStore((s) => s.airflowOn);
   const powerOn = useHVACStore((s) => s.powerOn);
@@ -433,6 +434,12 @@ export function HVACCanvas() {
           });
         }}
       >
+        <PerformanceMonitor
+          onDecline={() => {
+            if (quality === 'high') setQuality('medium');
+            else if (quality === 'medium') setQuality('low');
+          }}
+        />
         <SceneContents isSoftwareGl={isSoftwareGl} />
       </Canvas>
     </div>
