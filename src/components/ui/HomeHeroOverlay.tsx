@@ -54,14 +54,14 @@ export function HomeHeroOverlay() {
             <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
           </p>
 
-          <h1
+          <h2
             className="font-display font-extrabold tracking-tight text-white text-balance mx-auto max-w-3xl leading-[1.1]"
             style={{ fontSize: 'clamp(1.75rem, 3.85vw, 3.15rem)' }}
           >
             {language === 'en'
               ? 'Aircon Repair, Cleaning & Installation in Pampanga'
               : 'Aircon Repair, Cleaning & Installation sa Pampanga'}
-          </h1>
+          </h2>
 
           <p className="text-xs sm:text-sm md:text-[15px] text-slate-100 max-w-[45rem] mx-auto leading-relaxed font-normal">
             {language === 'en'

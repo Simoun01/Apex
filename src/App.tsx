@@ -28,6 +28,7 @@ import { HomeHeroOverlay } from './components/ui/HomeHeroOverlay';
 import { HomeMarketingSections } from './components/ui/HomeMarketingSections';
 import { MobileSheet } from './components/ui/MobileSheet';
 import { Non3DFallback } from './components/ui/Non3DFallback';
+import { ProductShowroomHero } from './components/ui/ProductShowroomHero';
 import { QuoteModal } from './components/ui/QuoteModal';
 import { TopBar } from './components/ui/TopBar';
 import { parseRouteFromLocation, useHVACStore } from './store/useHVACStore';
@@ -200,7 +201,11 @@ export default function App() {
       <TopBar />
 
       <main className="relative w-full">
+        {/* Product showroom hero sits above the 3D Residential / Commercial street scene */}
+        {stage === 'home' && <ProductShowroomHero />}
+
         <div
+          id="explore-3d"
           className={
             isLockedStage
               ? 'relative w-full h-[calc(100vh-58px)]'
