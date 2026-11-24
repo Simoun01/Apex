@@ -1,15 +1,17 @@
-import { Html, OrbitControls, RoundedBox, ContactShadows } from '@react-three/drei';
+import { Html, OrbitControls, ContactShadows } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { CalendarCheck, Gauge, RotateCcw, Wind, X, Zap } from 'lucide-react';
+import { Boxes, CalendarCheck, Gauge, RotateCcw, Wind, X, Zap } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ReactNode, RefObject } from 'react';
+import type { RefObject } from 'react';
 import * as THREE from 'three';
 import { BRANDS, CATALOG_KIND, KINDS, featuresFor, specFor } from '../../data/airconBrands';
 import type { Brand, BrandId, PartId, UnitKind } from '../../data/airconBrands';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import { ExplodeProvider, MODELS, StudioEnvironment } from '../scene/airconModels';
+import type { ExplodeRef, Motion, MotionRef, V3 } from '../scene/airconModels';
 
 /* ============================================================================
    3D aircon inspector.
@@ -24,112 +26,16 @@ export interface InspectTarget {
   variant: string;
   /** Where the unit sits on screen, so the model flies out from it */
   origin: { x: number; y: number };
-}
-
-type V3 = [number, number, number];
-
-type MotionRef = { current: Motion };
-
-/* ── Fan speed shared with the models through a ref (no re-render per frame) ── */
-interface Motion {
-  speed: number; // 0..1, eased toward target
-  target: number;
-}
-
-function useSpin(motionRef: MotionRef, axis: 'x' | 'y' | 'z', rate: number) {
-  const ref = useRef<THREE.Group>(null);
-  useFrame((_, dt) => {
-    if (ref.current) ref.current.rotation[axis] += dt * rate * (0.15 + motionRef.current.speed * 1.6);
-  });
-  return ref;
-}
-
-/* ── Primitive helpers ── */
-
-function Mat({ color, rough = 0.45, metal = 0.05, emissive }: { color: string; rough?: number; metal?: number; emissive?: string }) {
-  return <meshStandardMaterial color={color} roughness={rough} metalness={metal} emissive={emissive ?? '#000000'} emissiveIntensity={emissive ? 0.9 : 0} />;
-}
-
-function Box({ p, s, color, rough, metal, emissive }: { p: V3; s: V3; color: string; rough?: number; metal?: number; emissive?: string }) {
-  return (
-    <mesh position={p} castShadow receiveShadow>
-      <boxGeometry args={s} />
-      <Mat color={color} rough={rough} metal={metal} emissive={emissive} />
-    </mesh>
-  );
-}
-
-/** Row of thin bars: grilles, slats, fins. */
-function Bars({ p, len, count, gap, axis, thick = 0.006, depth = 0.01, color }: { p: V3; len: number; count: number; gap: number; axis: 'x' | 'y'; thick?: number; depth?: number; color: string }) {
-  return (
-    <group position={p}>
-      {Array.from({ length: count }, (_, i) => {
-        const o = (i - (count - 1) / 2) * gap;
-        return axis === 'x' ? (
-          <Box key={i} p={[0, o, 0]} s={[len, thick, depth]} color={color} rough={0.6} />
-        ) : (
-          <Box key={i} p={[o, 0, 0]} s={[thick, len, depth]} color={color} rough={0.6} />
-        );
-      })}
-    </group>
-  );
-}
-
-/** Propeller fan facing +z (rotate the group to aim it). */
-function Propeller({ r, motionRef, rate = 9, blades = 3, color = '#3b4452', guard = true }: { r: number; motionRef: MotionRef; rate?: number; blades?: number; color?: string; guard?: boolean }) {
-  const spin = useSpin(motionRef, 'z', rate);
-  const blade = useMemo(() => {
-    const s = new THREE.Shape();
-    s.moveTo(0, 0);
-    s.bezierCurveTo(r * 0.25, r * 0.5, r * 0.85, r * 0.6, r * 0.9, r * 0.15);
-    s.bezierCurveTo(r * 0.6, r * 0.05, r * 0.3, 0, 0, 0);
-    return new THREE.ExtrudeGeometry(s, { depth: 0.008, bevelEnabled: false });
-  }, [r]);
-  return (
-    <group>
-      <mesh position={[0, 0, -0.012]}>
-        <circleGeometry args={[r * 1.02, 40]} />
-        <meshStandardMaterial color="#0b1220" roughness={0.9} />
-      </mesh>
-      <group ref={spin}>
-        {Array.from({ length: blades }, (_, i) => (
-          <mesh key={i} geometry={blade} rotation={[0.25, 0, (i * Math.PI * 2) / blades]} castShadow>
-            <meshStandardMaterial color={color} roughness={0.5} metalness={0.2} side={THREE.DoubleSide} />
-          </mesh>
-        ))}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[r * 0.14, r * 0.14, 0.04, 20]} />
-          <Mat color="#94a3b8" metal={0.4} rough={0.3} />
-        </mesh>
-      </group>
-      {guard && (
-        <group position={[0, 0, 0.03]}>
-          {[0.4, 0.7, 1].map((k) => (
-            <mesh key={k}>
-              <torusGeometry args={[r * k, 0.0035, 6, 48]} />
-              <Mat color="#64748b" metal={0.6} rough={0.35} />
-            </mesh>
-          ))}
-          {[0, 1, 2, 3].map((i) => (
-            <group key={i} rotation={[0, 0, (i * Math.PI) / 4]}>
-              <Box p={[0, 0, 0]} s={[r * 2, 0.005, 0.005]} color="#64748b" metal={0.6} />
-            </group>
-          ))}
-        </group>
-      )}
-    </group>
-  );
+  /** Brand to show first (defaults to Daikin for homes, Trane for commercial) */
+  brandId?: BrandId;
+  /** Open straight into the exploded view */
+  exploded?: boolean;
 }
 
 /* ============================================================================
-   Models — every unit faces +z, centred on the origin, about 1.2 m across.
-   ANCHORS place the glowing highlight for each part.
+   Part anchors — every unit faces +z, centred on the origin, about 1.2 m across.
+   ANCHORS place the glowing highlight for each part (models: ../scene/airconModels).
    ============================================================================ */
-
-interface ModelProps {
-  brand: Brand;
-  motionRef: MotionRef;
-}
 
 type Anchor = { p: V3; s: V3 };
 
@@ -205,285 +111,6 @@ const ANCHORS: Record<UnitKind, Partial<Record<PartId | 'body', Anchor>>> = {
     fan: { p: [0, 0.0, 0], s: [0.5, 0.1, 0.5] },
     coil: { p: [0, -0.02, 0], s: [0.7, 0.14, 0.7] },
   },
-};
-
-/** Small outdoor condenser behind wall / floor units, so the compressor and outdoor fan can be shown. */
-function CompanionOutdoor({ brand, motionRef, at }: ModelProps & { at: V3 }) {
-  return (
-    <group position={at} scale={0.62}>
-      <RoundedBox args={[0.78, 0.56, 0.3]} radius={0.02} smoothness={3} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.5} />
-      </RoundedBox>
-      <group position={[-0.1, 0, 0.152]}>
-        <Propeller r={0.21} motionRef={motionRef} rate={11} color="#4b5563" />
-      </group>
-      <Bars p={[0.29, 0, 0.152]} len={0.46} count={12} gap={0.036} axis="x" color={brand.trim} />
-      {/* Compressor dome visible through a cut-away side */}
-      <mesh position={[0.3, -0.06, 0.0]}>
-        <capsuleGeometry args={[0.1, 0.14, 6, 18]} />
-        <Mat color="#1f2937" metal={0.5} rough={0.35} />
-      </mesh>
-      <Box p={[0.395, -0.18, 0.08]} s={[0.04, 0.04, 0.04]} color="#c08a2b" metal={0.8} rough={0.3} />
-    </group>
-  );
-}
-
-function WallModel({ brand, motionRef }: ModelProps) {
-  const flap = useRef<THREE.Group>(null);
-  const cross = useSpin(motionRef, 'x', 14);
-  useFrame(({ clock }) => {
-    if (flap.current) flap.current.rotation.x = 0.55 + Math.sin(clock.elapsedTime * (0.6 + motionRef.current.speed * 0.6)) * 0.35;
-  });
-  return (
-    <group>
-      <RoundedBox args={[1.0, 0.3, 0.24]} radius={0.05} smoothness={5} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.32} />
-      </RoundedBox>
-      {/* Front fascia with a soft sheen line */}
-      <Box p={[0, 0.03, 0.121]} s={[0.94, 0.19, 0.004]} color={brand.body} rough={0.18} />
-      <Box p={[0, 0.115, 0.124]} s={[0.94, 0.006, 0.003]} color={brand.accent} emissive={brand.accent} />
-      {/* Top intake grille (filter behind it) */}
-      <group position={[0, 0.151, -0.01]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Bars p={[0, 0, 0]} len={0.18} count={60} gap={0.015} axis="y" thick={0.004} depth={0.003} color={brand.trim} />
-      </group>
-      {/* Outlet slot with cross-flow fan */}
-      <Box p={[0, -0.1, 0.07]} s={[0.9, 0.07, 0.14]} color="#0f172a" rough={0.9} />
-      <group position={[0, -0.09, 0.07]} ref={cross}>
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.86, 18, 1, true]} />
-          <meshStandardMaterial color="#64748b" roughness={0.5} wireframe />
-        </mesh>
-      </group>
-      {/* Swing louver */}
-      <group position={[0, -0.122, 0.13]} ref={flap}>
-        <Box p={[0, 0, -0.03]} s={[0.88, 0.006, 0.06]} color={brand.body} rough={0.3} />
-      </group>
-      {/* Display + sensor */}
-      <Box p={[0.37, -0.02, 0.124]} s={[0.1, 0.035, 0.004]} color="#0b1f3a" />
-      <group position={[0.37, -0.02, 0.127]}>
-        <Box p={[-0.0176, 0, 0]} s={[0.0240, 0.0200, 0.002]} color={brand.accent} emissive={brand.accent} />
-        <Box p={[0.0160, 0, 0]} s={[0.0240, 0.0200, 0.002]} color={brand.accent} emissive={brand.accent} />
-      </group>
-      <mesh position={[-0.4, -0.04, 0.124]}>
-        <sphereGeometry args={[0.018, 16, 12]} />
-        <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.6} />
-      </mesh>
-      <Box p={[-0.33, 0.06, 0.124]} s={[0.1, 0.012, 0.003]} color={brand.trim} />
-      <CompanionOutdoor brand={brand} motionRef={motionRef} at={[0.78, -0.72, -0.5]} />
-    </group>
-  );
-}
-
-function FloorModel({ brand, motionRef }: ModelProps) {
-  const vanes = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (!vanes.current) return;
-    const a = Math.sin(clock.elapsedTime * (0.5 + motionRef.current.speed * 0.5)) * 0.45;
-    vanes.current.children.forEach((c) => (c.rotation.y = a));
-  });
-  return (
-    <group>
-      <RoundedBox args={[0.52, 1.72, 0.32]} radius={0.06} smoothness={5} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.3} />
-      </RoundedBox>
-      <Box p={[0, 0.72, 0.162]} s={[0.5, 0.01, 0.004]} color={brand.accent} emissive={brand.accent} />
-      <Box p={[0, 0.82, 0.162]} s={[0.2, 0.07, 0.004]} color="#0b1f3a" />
-      <group position={[0, 0.82, 0.165]}>
-        <Box p={[-0.0352, 0, 0]} s={[0.0480, 0.0400, 0.002]} color={brand.accent} emissive={brand.accent} />
-        <Box p={[0.0320, 0, 0]} s={[0.0480, 0.0400, 0.002]} color={brand.accent} emissive={brand.accent} />
-      </group>
-      <Box p={[0, 0.42, 0.158]} s={[0.4, 0.6, 0.006]} color="#111827" rough={0.8} />
-      <group ref={vanes} position={[0, 0.42, 0.17]}>
-        {Array.from({ length: 9 }, (_, i) => (
-          <group key={i} position={[(i - 4) * 0.042, 0, 0]}>
-            <Box p={[0, 0, 0]} s={[0.006, 0.58, 0.04]} color="#9ca3af" metal={0.2} />
-          </group>
-        ))}
-      </group>
-      <Bars p={[0, -0.5, 0.162]} len={0.44} count={22} gap={0.024} axis="x" color={brand.trim} />
-      <CompanionOutdoor brand={brand} motionRef={motionRef} at={[0.95, -0.6, -0.6]} />
-    </group>
-  );
-}
-
-function WindowModel({ brand, motionRef }: ModelProps) {
-  return (
-    <group>
-      <RoundedBox args={[0.62, 0.4, 0.7]} radius={0.02} smoothness={3} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.4} />
-      </RoundedBox>
-      {/* Front: grille, vanes, control strip */}
-      <Box p={[-0.07, 0.04, 0.352]} s={[0.44, 0.32, 0.006]} color={brand.trim} />
-      <Bars p={[-0.07, 0.12, 0.358]} len={0.42} count={7} gap={0.022} axis="x" thick={0.008} depth={0.02} color="#94a3b8" />
-      <Box p={[-0.07, -0.06, 0.356]} s={[0.42, 0.13, 0.004]} color="#1f2937" />
-      <Bars p={[-0.07, -0.06, 0.36]} len={0.13} count={20} gap={0.02} axis="y" color="#475569" />
-      <Box p={[0.24, 0.0, 0.352]} s={[0.11, 0.34, 0.006]} color={brand.body} />
-      <Box p={[0.24, 0.13, 0.357]} s={[0.08, 0.045, 0.004]} color="#0b1f3a" />
-      <group position={[0.24, 0.13, 0.36]}>
-        <Box p={[-0.0132, 0, 0]} s={[0.0180, 0.0250, 0.002]} color={brand.accent} emissive={brand.accent} />
-        <Box p={[0.0120, 0, 0]} s={[0.0180, 0.0250, 0.002]} color={brand.accent} emissive={brand.accent} />
-      </group>
-      {[0.03, -0.08].map((y) => (
-        <mesh key={y} position={[0.24, y, 0.36]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.025, 0.025, 0.02, 24]} />
-          <Mat color="#cbd5e1" metal={0.3} rough={0.3} />
-        </mesh>
-      ))}
-      {/* Side louvres and the rear condenser fan */}
-      {[-0.312, 0.312].map((x) => (
-        <group key={x} position={[x, 0, -0.12]} rotation={[0, Math.PI / 2, 0]}>
-          <Bars p={[0, 0, 0]} len={0.3} count={12} gap={0.026} axis="y" color={brand.trim} depth={0.006} />
-        </group>
-      ))}
-      <group position={[0, 0, -0.352]} rotation={[0, Math.PI, 0]}>
-        <Box p={[0, 0, 0.0]} s={[0.56, 0.36, 0.004]} color="#475569" />
-        <Propeller r={0.15} motionRef={motionRef} rate={10} />
-      </group>
-    </group>
-  );
-}
-
-function VrfModel({ brand, motionRef }: ModelProps) {
-  return (
-    <group>
-      <RoundedBox args={[0.96, 1.6, 0.76]} radius={0.02} smoothness={3} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.5} />
-      </RoundedBox>
-      {/* Coil grilles on the front and sides */}
-      <Bars p={[0, 0.12, 0.382]} len={0.88} count={34} gap={0.03} axis="x" color={brand.trim} />
-      {[-0.482, 0.482].map((x) => (
-        <group key={x} position={[x, 0.12, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <Bars p={[0, 0, 0]} len={0.68} count={34} gap={0.03} axis="x" color={brand.trim} />
-        </group>
-      ))}
-      <Box p={[0, -0.5, 0.382]} s={[0.92, 0.48, 0.004]} color={brand.body} />
-      <Box p={[-0.32, -0.66, 0.386]} s={[0.2, 0.1, 0.004]} color="#0b1f3a" />
-      <Box p={[-0.32, -0.62, 0.389]} s={[0.04, 0.012, 0.002]} color="#22c55e" emissive="#22c55e" />
-      {[0.32, 0.4].map((x) => (
-        <mesh key={x} position={[x, -0.68, 0.4]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.05, 16]} />
-          <Mat color="#c08a2b" metal={0.85} rough={0.25} />
-        </mesh>
-      ))}
-      <Box p={[0, -0.785, 0]} s={[0.98, 0.03, 0.78]} color="#334155" />
-      {/* Top fan, pointing up */}
-      <group position={[0, 0.805, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Propeller r={0.32} motionRef={motionRef} rate={8} blades={4} />
-      </group>
-      <Box p={[0.4, -0.3, 0.386]} s={[0.12, 0.02, 0.002]} color={brand.accent} emissive={brand.accent} />
-    </group>
-  );
-}
-
-function PackagedModel({ brand, motionRef }: ModelProps) {
-  return (
-    <group>
-      <RoundedBox args={[1.6, 0.82, 1.08]} radius={0.02} smoothness={3} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.5} />
-      </RoundedBox>
-      <Box p={[0, -0.43, 0]} s={[1.64, 0.05, 1.1]} color="#334155" />
-      <group position={[-0.52, 0, 0.542]}>
-        <Bars p={[0, 0, 0]} len={0.7} count={18} gap={0.03} axis="y" color={brand.trim} />
-      </group>
-      {[0.0, 0.3, 0.6].map((x) => (
-        <group key={x}>
-          <Box p={[x, -0.02, 0.542]} s={[0.27, 0.7, 0.006]} color={brand.body} />
-          <Box p={[x + 0.1, -0.02, 0.548]} s={[0.02, 0.08, 0.008]} color="#475569" metal={0.5} />
-        </group>
-      ))}
-      <Box p={[0.6, 0.22, 0.547]} s={[0.1, 0.04, 0.004]} color={brand.accent} emissive={brand.accent} />
-      {[-0.36, 0.36].map((x) => (
-        <group key={x} position={[x, 0.415, -0.14]} rotation={[-Math.PI / 2, 0, 0]}>
-          <Propeller r={0.28} motionRef={motionRef} rate={8} blades={4} />
-        </group>
-      ))}
-    </group>
-  );
-}
-
-function DuctedModel({ brand, motionRef }: ModelProps) {
-  const blower = useSpin(motionRef, 'x', 12);
-  return (
-    <group>
-      <RoundedBox args={[1.1, 0.3, 0.7]} radius={0.015} smoothness={3} castShadow receiveShadow>
-        <Mat color="#a7b3c2" rough={0.45} metal={0.3} />
-      </RoundedBox>
-      {/* Supply flange and blower */}
-      <Box p={[0, 0, 0.37]} s={[0.98, 0.26, 0.04]} color="#8a98ab" metal={0.4} />
-      <Box p={[0, 0, 0.392]} s={[0.92, 0.2, 0.004]} color="#0f172a" />
-      <group position={[0, 0, 0.33]} ref={blower}>
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.84, 22, 1, true]} />
-          <meshStandardMaterial color="#64748b" wireframe />
-        </mesh>
-      </group>
-      {/* Return filter rack */}
-      <Box p={[0, 0, -0.355]} s={[1.0, 0.26, 0.01]} color={brand.trim} />
-      <Bars p={[0, 0, -0.362]} len={0.24} count={30} gap={0.032} axis="y" color="#64748b" />
-      {/* Control box with brand strip */}
-      <Box p={[0.56, 0, 0.1]} s={[0.03, 0.2, 0.22]} color="#e5e7eb" />
-      <Box p={[0.577, 0.05, 0.1]} s={[0.004, 0.02, 0.12]} color={brand.accent} emissive={brand.accent} />
-      {[-0.5, 0.5].map((x) =>
-        [-0.3, 0.3].map((z) => <Box key={`${x}${z}`} p={[x, 0.2, z]} s={[0.012, 0.12, 0.012]} color="#64748b" metal={0.6} />),
-      )}
-    </group>
-  );
-}
-
-function CassetteModel({ brand, motionRef }: ModelProps) {
-  const flaps = useRef<THREE.Group>(null);
-  const fan = useSpin(motionRef, 'y', 10);
-  useFrame(({ clock }) => {
-    if (!flaps.current) return;
-    const a = 0.4 + Math.sin(clock.elapsedTime * (0.6 + motionRef.current.speed * 0.5)) * 0.3;
-    flaps.current.children.forEach((c) => ((c.children[0] as THREE.Object3D).rotation.x = a));
-  });
-  return (
-    <group>
-      <Box p={[0, -0.04, 0]} s={[0.7, 0.22, 0.7]} color="#cbd5e1" metal={0.2} />
-      <RoundedBox args={[0.86, 0.05, 0.86]} radius={0.02} smoothness={3} position={[0, 0.1, 0]} castShadow receiveShadow>
-        <Mat color={brand.body} rough={0.35} />
-      </RoundedBox>
-      <Box p={[0, 0.128, 0]} s={[0.4, 0.006, 0.4]} color={brand.trim} />
-      <group position={[0, 0.133, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <Bars p={[0, 0, 0]} len={0.38} count={14} gap={0.026} axis="y" depth={0.006} color="#94a3b8" />
-      </group>
-      <group ref={fan} position={[0, 0.0, 0]}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <Box key={i} p={[Math.cos((i * Math.PI) / 3) * 0.14, 0, Math.sin((i * Math.PI) / 3) * 0.14]} s={[0.12, 0.06, 0.02]} color="#64748b" />
-        ))}
-      </group>
-      {/* Four slots, each with a swinging flap */}
-      <group ref={flaps} position={[0, 0.128, 0]}>
-        {[0, 1, 2, 3].map((i) => (
-          <group key={i} rotation={[0, (i * Math.PI) / 2, 0]}>
-            <group position={[0, 0, 0.31]}>
-              <Box p={[0, 0, 0]} s={[0.56, 0.006, 0.06]} color={brand.body} />
-            </group>
-          </group>
-        ))}
-      </group>
-      {[0, 1, 2, 3].map((i) => (
-        <group key={i} rotation={[0, (i * Math.PI) / 2, 0]}>
-          <Box p={[0, 0.126, 0.31]} s={[0.6, 0.004, 0.08]} color="#0f172a" />
-        </group>
-      ))}
-      <mesh position={[0.34, 0.13, 0.34]}>
-        <sphereGeometry args={[0.014, 12, 10]} />
-        <meshStandardMaterial color={brand.accent} emissive={brand.accent} emissiveIntensity={1} />
-      </mesh>
-    </group>
-  );
-}
-
-const MODELS: Record<UnitKind, (p: ModelProps) => ReactNode> = {
-  wall: WallModel,
-  floor: FloorModel,
-  window: WindowModel,
-  vrf: VrfModel,
-  packaged: PackagedModel,
-  ducted: DuctedModel,
-  cassette: CassetteModel,
 };
 
 /* ── Airflow: cold air out of the outlet, warm air off condensers ── */
@@ -588,16 +215,18 @@ function fitScale(kind: UnitKind) {
   return (kind === 'wall' || kind === 'floor' ? 1.45 : 1.2) / (Math.max(b[0] * extra, b[1], b[2]) || 1);
 }
 
-function Stage({ kind, brand, motionRef, parts, picked, onPick, labelOf, pinRoot }: { pinRoot: RefObject<HTMLDivElement | null>; kind: UnitKind; brand: Brand; motionRef: MotionRef; parts: PartId[]; picked: number | null; onPick: (i: number) => void; labelOf: (i: number) => string }) {
+function Stage({ kind, brand, motionRef, explodeRef, exploded, en, parts, picked, onPick, labelOf, pinRoot }: { pinRoot: RefObject<HTMLDivElement | null>; kind: UnitKind; brand: Brand; motionRef: MotionRef; explodeRef: ExplodeRef; exploded: boolean; en: boolean; parts: PartId[]; picked: number | null; onPick: (i: number) => void; labelOf: (i: number) => string }) {
   const Model = MODELS[kind];
-  const s = fitScale(kind);
+  const s = fitScale(kind) * (exploded ? 0.72 : 1);
   const lift = kind === 'wall' ? 0.25 : 0;
   return (
-    <group scale={s} position={[kind === 'wall' ? -0.5 : kind === 'floor' ? -0.35 : 0, lift, 0]}>
-      <Model brand={brand} motionRef={motionRef} />
-      <Airflow kind={kind} motionRef={motionRef} />
-      {picked !== null && <Highlight a={anchorOf(kind, parts[picked])} color={brand.accent} />}
-      {parts.map((part, i) => {
+    <group scale={s} position={[exploded ? 0 : kind === 'wall' ? -0.5 : kind === 'floor' ? -0.35 : 0, exploded ? 0 : lift, 0]}>
+      <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en}>
+        <Model brand={brand} motionRef={motionRef} companion={!exploded} />
+      </ExplodeProvider>
+      {!exploded && <Airflow kind={kind} motionRef={motionRef} />}
+      {!exploded && picked !== null && <Highlight a={anchorOf(kind, parts[picked])} color={brand.accent} />}
+      {!exploded && parts.map((part, i) => {
         const a = anchorOf(kind, part);
         return (
           <Html key={`${part}${i}`} position={[a.p[0], a.p[1] + Math.min(a.s[1] / 2, 0.06), Math.max(a.p[2] + a.s[2] / 2, ANCHORS[kind].body!.p[2] + ANCHORS[kind].body!.s[2] / 2) + 0.03]} center zIndexRange={[30, 0]} portal={pinRoot as RefObject<HTMLElement>}>
@@ -631,7 +260,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
   const item = EQUIPMENT_CATALOG.find((e) => e.id === target.catalogId);
   const kind: UnitKind = CATALOG_KIND[target.catalogId] ?? 'wall';
   const k = KINDS[kind];
-  const [brandId, setBrandId] = useState<BrandId>(k.commercial ? 'trane' : 'daikin');
+  const [brandId, setBrandId] = useState<BrandId>(target.brandId ?? (k.commercial ? 'trane' : 'daikin'));
   const brand = BRANDS.find((b) => b.id === brandId)!;
   const spec = specFor(kind, brand, target.variant, item?.inverter ?? kind !== 'window');
   // Only parts this unit actually has; top up with the unit's standard parts.
@@ -643,6 +272,9 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
   const [picked, setPicked] = useState<number | null>(0);
   const [level, setLevel] = useState(Math.ceil(spec.fanSteps * 0.6));
   const [spinKey, setSpinKey] = useState(0);
+  const [exploded, setExploded] = useState(Boolean(target.exploded));
+  const explodeRef = useRef({ amount: 0, target: 0 });
+  explodeRef.current.target = exploded ? 1 : 0;
   const motionRef = useRef<Motion>({ speed: 0.6, target: 0.6 });
   const closeBtn = useRef<HTMLButtonElement>(null);
   const pinRoot = useRef<HTMLDivElement>(null);
@@ -715,16 +347,20 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
           <div className="ai-stage">
             <div ref={pinRoot} className="ai-pins" />
             <Canvas shadows resize={{ offsetSize: true }} dpr={[1, 2]} camera={{ position: narrow ? [2.1, 1.1, 3.9] : [1.5, 0.8, 2.7], fov: 36 }} gl={{ antialias: true, alpha: true }}>
-              <hemisphereLight args={['#e0f2fe', '#0b1220', 0.75]} />
-              <directionalLight position={[3, 5, 4]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} />
+              <StudioEnvironment intensity={0.9} />
+              <hemisphereLight args={['#e0f2fe', '#0b1220', 0.45]} />
+              <directionalLight position={[3, 5, 4]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
               <directionalLight position={[-4, 2, -3]} intensity={0.5} color="#93c5fd" />
-              <pointLight position={[0, 1.5, 2]} intensity={0.6} color={brand.accent} />
+              <pointLight position={[0, 1.5, 2]} intensity={0.4} color={brand.accent} />
               <group key={spinKey}>
                 <Stage
                   pinRoot={pinRoot}
                   kind={kind}
                   brand={brand}
                   motionRef={motionRef}
+                  explodeRef={explodeRef}
+                  exploded={exploded}
+                  en={en}
                   parts={features.map((f) => f.part)}
                   picked={picked}
                   onPick={setPicked}
@@ -745,6 +381,15 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
             </Canvas>
             <div className="ai-stage-bar">
               <span>{en ? 'Drag to turn · scroll to zoom' : 'I-drag para iikot · scroll para mag-zoom'}</span>
+              <button
+                type="button"
+                className={`ai-explode-btn${exploded ? ' is-on' : ''}`}
+                onClick={() => setExploded((v) => !v)}
+                aria-pressed={exploded}
+              >
+                <Boxes className="w-4 h-4" aria-hidden="true" />
+                {exploded ? (en ? 'Assemble' : 'Ibalik') : en ? 'Exploded view' : 'Exploded view'}
+              </button>
               <button type="button" className="ai-icon-btn" onClick={() => setSpinKey((n) => n + 1)} aria-label={en ? 'Reset view' : 'I-reset ang view'}>
                 <RotateCcw className="w-4 h-4" aria-hidden="true" />
               </button>
