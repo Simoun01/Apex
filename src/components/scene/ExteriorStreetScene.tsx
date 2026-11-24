@@ -2,12 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useHVACStore } from '../../store/useHVACStore';
-import {
-  createBrushedMetalMaps,
-  createCopperPatinaMaps,
-  createMatteWallBumpMap,
-  createWoodGrainMaps,
-} from './hvacSceneUtils';
+import { createBrushedMetalMaps } from './hvacSceneUtils';
+import { CommercialBuilding, ResidentialHouse } from './StreetBuildings';
 
 const GOLDEN_HOUR_VERTEX = /* glsl */ `
   varying vec3 vWorldPos;
@@ -355,28 +351,15 @@ export function ExteriorStreetScene() {
   const setHoveredHomeBuilding = useHVACStore((s) => s.setHoveredHomeBuilding);
   const enterExperience = useHVACStore((s) => s.enterExperience);
 
-  const wallBump = useMemo(() => createMatteWallBumpMap(), []);
   const metalMaps = useMemo(() => createBrushedMetalMaps(), []);
-  const woodMaps = useMemo(() => createWoodGrainMaps(), []);
-  const copperMaps = useMemo(() => createCopperPatinaMaps(), []);
 
   useEffect(() => {
     const aniso = quality === 'high' ? 8 : quality === 'medium' ? 4 : 1;
-    [
-      wallBump,
-      metalMaps.map,
-      metalMaps.roughnessMap,
-      metalMaps.bumpMap,
-      metalMaps.normalMap,
-      woodMaps.map,
-      woodMaps.roughnessMap,
-      copperMaps.map,
-      copperMaps.roughnessMap,
-    ].forEach((tex) => {
+    [metalMaps.map, metalMaps.roughnessMap, metalMaps.bumpMap, metalMaps.normalMap].forEach((tex) => {
       tex.anisotropy = aniso;
       tex.needsUpdate = true;
     });
-  }, [quality, wallBump, metalMaps, woodMaps, copperMaps]);
+  }, [quality, metalMaps]);
 
   const skyUniforms = useMemo(
     () => ({
@@ -388,17 +371,12 @@ export function ExteriorStreetScene() {
   useEffect(() => {
     return () => {
       gl.domElement.style.cursor = 'auto';
-      wallBump.dispose();
       metalMaps.map.dispose();
       metalMaps.roughnessMap.dispose();
       metalMaps.bumpMap.dispose();
       metalMaps.normalMap.dispose();
-      woodMaps.map.dispose();
-      woodMaps.roughnessMap.dispose();
-      copperMaps.map.dispose();
-      copperMaps.roughnessMap.dispose();
     };
-  }, [gl, wallBump, metalMaps, woodMaps, copperMaps]);
+  }, [gl, metalMaps]);
 
   const handleBuildingHover = (target: 'residential' | 'commercial' | null, e?: ThreeEvent<PointerEvent>) => {
     e?.stopPropagation();
@@ -529,142 +507,14 @@ export function ExteriorStreetScene() {
         {/* Residential Perimeter Fence & Gate (Instanced posts) */}
         <ResidentialFenceInstanced />
 
-        {/* Bungalow Foundation Slab */}
-        <mesh position={[-4.2, 0.14, -1.75]} castShadow receiveShadow>
-          <boxGeometry args={[4.85, 0.28, 3.8]} />
-          <meshStandardMaterial color="#475569" roughness={0.86} />
-        </mesh>
-
-        {/* Bungalow Concrete Walls */}
-        <mesh position={[-4.2, 1.48, -1.75]} castShadow receiveShadow>
-          <boxGeometry args={[4.5, 2.42, 3.4]} />
-          <meshStandardMaterial
-            color="#e7dfd1"
-            bumpMap={wallBump}
-            bumpScale={0.015}
-            roughness={0.88}
-          />
-        </mesh>
-        {/* Accent slate column & dado strip */}
-        <mesh position={[-5.95, 1.48, -0.02]} castShadow receiveShadow>
-          <boxGeometry args={[0.92, 2.44, 0.14]} />
-          <meshStandardMaterial color="#334155" roughness={0.82} />
-        </mesh>
-
-        {/* Pitched Metal Roof (Gable/Hip layered eaves + corrugated ridge) */}
-        <mesh position={[-4.2, 2.72, -1.75]} castShadow receiveShadow>
-          <boxGeometry args={[5.2, 0.14, 4.1]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.62} metalness={0.35} />
-        </mesh>
-        <mesh position={[-4.2, 3.32, -1.75]} rotation={[0, Math.PI / 4, 0]} castShadow receiveShadow>
-          <coneGeometry args={[3.55, 1.18, 4]} />
-          <meshStandardMaterial
-            map={metalMaps.map}
-            roughnessMap={metalMaps.roughnessMap}
-            color="#3b536b"
-            roughness={0.42}
-            metalness={0.58}
-          />
-        </mesh>
-
-        {/* Front Porch Canopy + Wooden Door + Warm Lantern */}
-        <mesh position={[-4.2, 2.28, 0.18]} castShadow>
-          <boxGeometry args={[1.65, 0.1, 0.72]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.55} metalness={0.3} />
-        </mesh>
-        <mesh position={[-4.2, 1.18, -0.03]} castShadow>
-          <boxGeometry args={[0.92, 1.85, 0.08]} />
-          <meshStandardMaterial
-            map={woodMaps.map}
-            roughnessMap={woodMaps.roughnessMap}
-            color="#8c5432"
-            roughness={0.52}
-          />
-        </mesh>
-        <mesh position={[-3.55, 1.72, -0.01]}>
-          <sphereGeometry args={[0.075, quality === 'low' ? 6 : 12, quality === 'low' ? 6 : 12]} />
-          <meshBasicMaterial color="#fde68a" />
-        </mesh>
-        {quality !== 'low' && (
-          <pointLight position={[-3.55, 1.72, 0.28]} color="#fbbf24" intensity={1.35} distance={4.5} decay={2} />
-        )}
-
-        {/* Sliding Glass Windows with Warm Interior Evening Glow */}
-        {[
-          [-2.85, 1.48, -0.03, 1.15, 1.1],
-          [-5.45, 1.52, -0.03, 0.65, 1.05],
-        ].map(([wx, wy, wz, ww, wh], idx) => (
-          <group key={idx} position={[wx, wy, wz]}>
-            <mesh>
-              <boxGeometry args={[ww + 0.1, wh + 0.1, 0.06]} />
-              <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.65} />
-            </mesh>
-            <mesh position={[0, 0, 0.01]}>
-              <planeGeometry args={[ww, wh]} />
-              <meshStandardMaterial
-                color="#fef3c7"
-                emissive="#f59e0b"
-                emissiveIntensity={1.2}
-                roughness={0.18}
-              />
-            </mesh>
-          </group>
-        ))}
-
-        {/* Side-Wall Mounted Split-Type Outdoor Condenser Unit */}
-        <group position={[-1.68, 1.46, -1.45]}>
-          {/* Steel wall mounting brackets */}
-          <mesh position={[-0.22, -0.34, -0.26]} castShadow>
-            <boxGeometry args={[0.42, 0.05, 0.05]} />
-            <meshStandardMaterial color="#334155" roughness={0.45} metalness={0.7} />
-          </mesh>
-          <mesh position={[-0.22, -0.34, 0.26]} castShadow>
-            <boxGeometry args={[0.42, 0.05, 0.05]} />
-            <meshStandardMaterial color="#334155" roughness={0.45} metalness={0.7} />
-          </mesh>
-          {/* Condenser casing */}
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[0.38, 0.62, 0.82]} />
-            <meshStandardMaterial
-              map={metalMaps.map}
-              roughnessMap={metalMaps.roughnessMap}
-              color="#e2e8f0"
-              roughness={0.42}
-              metalness={0.5}
-            />
-          </mesh>
-          {/* Front fan grille */}
-          <mesh position={[0.2, 0.02, -0.08]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.23, 0.23, 0.025, 20]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.55} metalness={0.6} wireframe />
-          </mesh>
-          <ExteriorFanRotor
-            position={[0.19, 0.02, -0.08]}
-            rotation={[0, Math.PI / 2, 0]}
-            radius={0.21}
-            speed={5.8}
-          />
-          {/* Insulated copper lineset going into wall */}
-          <mesh position={[-0.14, 0.22, 0.38]}>
-            <cylinderGeometry args={[0.032, 0.032, 0.36, 10]} />
-            <meshStandardMaterial
-              map={copperMaps.map}
-              roughnessMap={copperMaps.roughnessMap}
-              color="#d97706"
-              metalness={0.75}
-              roughness={0.32}
-            />
-          </mesh>
-          {/* Faint heat shimmer above condenser */}
-          {quality !== 'low' && (
-            <HeatShimmerPlume
-              position={[0.06, 0.34, 0]}
-              width={0.48}
-              height={0.58}
-              count={quality === 'high' ? 2 : 1}
-            />
-          )}
+        {/* Detailed bungalow: hollow walls with real openings, hip roof, furnished interior and its
+            split-type system. Hovering the house (or its Explore button) switches on x-ray. */}
+        <group position={[-4.2, 0, -1.75]}>
+          <ResidentialHouse xray={hoveredHomeBuilding === 'residential'} quality={quality} />
         </group>
+        {quality !== 'low' && (
+          <HeatShimmerPlume position={[-1.62, 1.78, -1.45]} width={0.48} height={0.58} count={quality === 'high' ? 2 : 1} />
+        )}
 
         {/* Cyan Highlight Rim when Residential CTA / Building is Hovered */}
         <BuildingHoverRim
@@ -705,105 +555,11 @@ export function ExteriorStreetScene() {
           <meshStandardMaterial color="#2f5a38" roughness={0.88} />
         </mesh>
 
-        {/* Two-Storey Architectural Massing */}
-        <mesh position={[4.3, 2.65, -1.85]} castShadow receiveShadow>
-          <boxGeometry args={[4.95, 5.25, 3.7]} />
-          <meshStandardMaterial
-            color="#cbd5e1"
-            bumpMap={wallBump}
-            bumpScale={0.015}
-            roughness={0.82}
-          />
-        </mesh>
-        {/* Dark Slate Structural Piers & Roof Parapet */}
-        <mesh position={[2.0, 2.68, -0.02]} castShadow receiveShadow>
-          <boxGeometry args={[0.42, 5.32, 0.22]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.58} metalness={0.35} />
-        </mesh>
-        <mesh position={[6.6, 2.68, -0.02]} castShadow receiveShadow>
-          <boxGeometry args={[0.42, 5.32, 0.22]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.58} metalness={0.35} />
-        </mesh>
-        <mesh position={[4.3, 5.38, -1.85]} castShadow receiveShadow>
-          <boxGeometry args={[5.18, 0.28, 3.92]} />
-          <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.45} />
-        </mesh>
-
-        {/* Ground-Floor Glass Storefront + Warm Interior Retail Glow */}
-        <mesh position={[4.3, 1.32, 0.02]}>
-          <planeGeometry args={[4.05, 2.35]} />
-          <meshStandardMaterial
-            color="#fde68a"
-            emissive="#f59e0b"
-            emissiveIntensity={0.85}
-            roughness={0.22}
-          />
-        </mesh>
-        <mesh key={`storefront-glass-${quality}`} position={[4.3, 1.32, 0.04]}>
-          <boxGeometry args={[4.12, 2.42, 0.05]} />
-          {quality === 'low' ? (
-            <meshStandardMaterial
-              color="#bae6fd"
-              transparent
-              opacity={0.38}
-              roughness={0.22}
-              metalness={0.05}
-            />
-          ) : (
-            <meshPhysicalMaterial
-              color="#bae6fd"
-              transparent
-              opacity={0.38}
-              roughness={0.08}
-              metalness={0.1}
-              clearcoat={1}
-            />
-          )}
-        </mesh>
-        {/* Storefront vertical mullions */}
-        {[3.25, 4.3, 5.35].map((mx) => (
-          <mesh key={mx} position={[mx, 1.32, 0.055]}>
-            <boxGeometry args={[0.07, 2.44, 0.07]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.4} metalness={0.7} />
-          </mesh>
-        ))}
-
-        {/* Illuminated Signage Fascia Band between 1st and 2nd floor */}
-        <mesh position={[4.3, 2.86, 0.08]} castShadow>
-          <boxGeometry args={[4.55, 0.56, 0.22]} />
-          <meshStandardMaterial color="#0f172a" roughness={0.38} metalness={0.65} />
-        </mesh>
-        <mesh position={[4.3, 2.86, 0.2]}>
-          <planeGeometry args={[4.25, 0.34]} />
-          <meshStandardMaterial
-            color="#fed7aa"
-            emissive="#f97316"
-            emissiveIntensity={1.1}
-            roughness={0.2}
-          />
-        </mesh>
-        {quality !== 'low' && (
-          <pointLight position={[4.3, 2.55, 0.85]} color="#fb923c" intensity={1.7} distance={6} decay={2} />
-        )}
-
-        {/* Second-Floor Office Ribbon Windows */}
-        {[-1.15, 0, 1.15].map((dx, i) => (
-          <group key={i} position={[4.3 + dx, 4.18, 0.02]}>
-            <mesh>
-              <boxGeometry args={[0.98, 1.24, 0.06]} />
-              <meshStandardMaterial color="#1e293b" roughness={0.42} metalness={0.65} />
-            </mesh>
-            <mesh position={[0, 0, 0.035]}>
-              <planeGeometry args={[0.88, 1.14]} />
-              <meshStandardMaterial
-                color="#fef3c7"
-                emissive="#fbbf24"
-                emissiveIntensity={0.95}
-                roughness={0.18}
-              />
-            </mesh>
-          </group>
-        ))}
+        {/* Detailed two-storey building: concrete frame, glass storefront, retail + office interiors,
+            ceiling cassettes, ducted unit and rooftop VRF. Hovering switches on x-ray. */}
+        <group position={[4.3, 0, -1.85]}>
+          <CommercialBuilding xray={hoveredHomeBuilding === 'commercial'} quality={quality} />
+        </group>
 
         {/* Instanced Row of 3 Commercial Condenser Units */}
         <CommercialCondenserRowInstanced
@@ -812,59 +568,16 @@ export function ExteriorStreetScene() {
           quality={quality}
         />
 
-        {/* Commercial Rooftop Cassette / VRF Unit */}
-        <group position={[4.3, 5.95, -1.85]}>
-          {/* Steel dunnage rails */}
-          <mesh position={[0, -0.4, -0.45]} castShadow>
-            <boxGeometry args={[1.9, 0.08, 0.1]} />
-            <meshStandardMaterial color="#334155" roughness={0.5} metalness={0.7} />
-          </mesh>
-          <mesh position={[0, -0.4, 0.45]} castShadow>
-            <boxGeometry args={[1.9, 0.08, 0.1]} />
-            <meshStandardMaterial color="#334155" roughness={0.5} metalness={0.7} />
-          </mesh>
-          {/* VRF chassis */}
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[1.75, 0.86, 0.96]} />
-            <meshStandardMaterial
-              map={metalMaps.map}
-              roughnessMap={metalMaps.roughnessMap}
-              color="#e2e8f0"
-              roughness={0.4}
-              metalness={0.55}
-            />
-          </mesh>
-          {/* Twin top discharge shrouds + spinning blades */}
-          {[-0.44, 0.44].map((fx, i) => (
-            <group key={i} position={[fx, 0.47, 0]}>
-              <mesh>
-                <cylinderGeometry args={[0.31, 0.33, 0.1, 20]} />
-                <meshStandardMaterial color="#1e293b" roughness={0.48} metalness={0.65} />
-              </mesh>
-              <ExteriorFanRotor
-                position={[0, 0.03, 0]}
-                rotation={[-Math.PI / 2, 0, 0]}
-                radius={0.27}
-                speed={4.6 + i * 0.5}
-              />
-            </group>
-          ))}
-          {quality !== 'low' && (
-            <HeatShimmerPlume
-              position={[0, 0.56, 0]}
-              width={1.35}
-              height={0.78}
-              count={quality === 'high' ? 3 : 1}
-            />
-          )}
-        </group>
+        {quality !== 'low' && (
+          <HeatShimmerPlume position={[4.3, 6.75, -1.85]} width={1.6} height={0.78} count={quality === 'high' ? 3 : 1} />
+        )}
 
         {/* Amber Highlight Rim when Commercial CTA / Building is Hovered */}
         <BuildingHoverRim
           active={hoveredHomeBuilding === 'commercial'}
           color="#F97316"
-          position={[4.3, 3.1, -1.85]}
-          size={[5.5, 6.25, 4.35]}
+          position={[4.3, 3.45, -1.85]}
+          size={[5.5, 6.95, 4.35]}
         />
       </group>
     </group>

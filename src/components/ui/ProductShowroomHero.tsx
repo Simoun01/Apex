@@ -133,7 +133,7 @@ const COLUMNS: ColumnDef[] = [
   buildColumn(
     'ceiling',
     { en: 'Cassette & Ducted', tl: 'Cassette at Ducted', subEn: 'Commercial indoor', subTl: 'Pang-negosyo (indoor)' },
-    'up',
+    'down',
     49,
     'amber',
     [
@@ -148,7 +148,7 @@ const COLUMNS: ColumnDef[] = [
   buildColumn(
     'outdoor',
     { en: 'VRF & Packaged', tl: 'VRF at Packaged', subEn: 'Commercial outdoor', subTl: 'Pang-negosyo (outdoor)' },
-    'down',
+    'up',
     55,
     'amber',
     [

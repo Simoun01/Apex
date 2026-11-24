@@ -617,6 +617,24 @@ function CompanionOutdoor({ brand, motionRef, at }: ModelProps & { at: V3 }) {
   );
 }
 
+/** Full-size split-type outdoor condenser (about 0.78 × 0.56 × 0.30 m), front facing +z. */
+export function OutdoorCondenser({ brand, motionRef }: ModelProps) {
+  return (
+    <group>
+      <RB s={[0.78, 0.56, 0.3]} radius={0.02} m={<Painted color={brand.body} />} />
+      <group position={[-0.1, 0, 0.152]}>
+        <Propeller r={0.21} motionRef={motionRef} rate={11} color="#4b5563" />
+      </group>
+      <Fins count={12} size={[0.18, 0.006, 0.01]} gap={0.036} axis="y" p={[0.27, 0, 0.152]} color={brand.trim} />
+      <Fins count={60} size={[0.0016, 0.5, 0.012]} gap={0.012} p={[0, 0, -0.152]} />
+      {[0.33, 0.37].map((x) => (
+        <Cyl key={x} p={[x, -0.2, 0.17]} r={[Math.PI / 2, 0, 0]} rad={0.012} len={0.04} m={<meshStandardMaterial {...BRASS} />} />
+      ))}
+      <B p={[0.26, 0.18, 0.152]} s={[0.12, 0.05, 0.004]} m={<Matte color="#cbd5e1" />} shadow={false} />
+    </group>
+  );
+}
+
 /* ── Floor-standing tower ── */
 
 function FloorModel({ brand, motionRef, companion }: ModelProps) {
