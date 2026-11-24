@@ -1,459 +1,401 @@
-import { CalendarCheck, ChevronDown, Settings2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { CalendarCheck, ChevronDown, Settings2, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { siteConfig } from '../../config/siteConfig';
-import { EQUIPMENT_CATALOG, EquipmentItem } from '../../data/hvacData';
+import { EQUIPMENT_CATALOG } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 
 /* ============================================================================
-   Geometry helpers
+   Projection
    ----------------------------------------------------------------------------
-   Products use a cabinet-oblique box (front face square to the viewer, depth
-   receding up-right) so every unit reads clearly at tile size. The centre
-   workshop uses a true 2:1 isometric box.
+   World space: +x runs toward the front-right, +y toward the front-left, +z up.
+   The projection is affine, so every box face is an affine image of a flat
+   rectangle. Face details are drawn as ordinary 2D SVG inside a `matrix()`
+   group and land on the face with correct perspective, including spinning fans.
    ============================================================================ */
 
 type Pt = [number, number];
-const pts = (list: Pt[]) => list.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 
-interface ObliqueBox {
+const VB_W = 1400;
+const VB_H = 700;
+const OX = 655;
+const OY = 170;
+const KX = 0.9;
+const KY = 0.34;
+const KZ = 0.95;
+
+const P = (x: number, y: number, z = 0): Pt => [OX + (x - y) * KX, OY + (x + y) * KY - z * KZ];
+const mat = (o: Pt, a: Pt, b: Pt) =>
+  `matrix(${a[0]} ${a[1]} ${b[0]} ${b[1]} ${o[0].toFixed(2)} ${o[1].toFixed(2)})`;
+const AX: Pt = [KX, KY]; // +x
+const AYN: Pt = [KX, -KY]; // -y
+const AY: Pt = [-KX, KY]; // +y
+const AZN: Pt = [0, KZ]; // -z
+
+const FLOOR_M = mat(P(0, 0, 0), AX, AY);
+
+function shade(hex: string, amt: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) =>
+    Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt)),
+  );
+  return `rgb(${ch[0]},${ch[1]},${ch[2]})`;
+}
+
+interface BlockProps {
   x: number;
   y: number;
+  z?: number;
   w: number;
-  h: number;
   d: number;
+  h: number;
+  color: string;
+  /** Drawn in local coords: top = w × d, left (+y face) = w × h, right (+x face) = d × h */
+  top?: ReactNode;
+  left?: ReactNode;
+  right?: ReactNode;
+  shadow?: boolean;
 }
 
-function oblique({ x, y, w, h, d }: ObliqueBox) {
-  const dx = d * 0.6;
-  const dy = -d * 0.4;
-  return {
-    front: pts([[x, y], [x + w, y], [x + w, y - h], [x, y - h]]),
-    top: pts([[x, y - h], [x + w, y - h], [x + w + dx, y - h + dy], [x + dx, y - h + dy]]),
-    side: pts([[x + w, y], [x + w + dx, y + dy], [x + w + dx, y - h + dy], [x + w, y - h]]),
-    /** Map (u, v) in [0,1]² on the top face to screen space. */
-    onTop: (u: number, v: number): Pt => [x + u * w + v * dx, y - h + v * dy],
-  };
-}
+const EDGE = { stroke: 'rgba(15,23,42,0.28)', strokeWidth: 0.7, vectorEffect: 'non-scaling-stroke' as const };
 
-function ObBox({
-  box,
-  front,
-  top,
-  side,
-  stroke = 'rgba(15,23,42,0.35)',
-}: {
-  box: ObliqueBox;
-  front: string;
-  top: string;
-  side: string;
-  stroke?: string;
-}) {
-  const f = oblique(box);
+function Block({ x, y, z = 0, w, d, h, color, top, left, right, shadow }: BlockProps) {
+  const castShadow = shadow ?? z === 0;
   return (
-    <g strokeLinejoin="round" strokeWidth={0.8} stroke={stroke}>
-      <polygon points={f.side} fill={side} />
-      <polygon points={f.top} fill={top} />
-      <polygon points={f.front} fill={front} />
-    </g>
-  );
-}
-
-/** Spinning fan seen on a top face (ellipse). */
-function TopFan({ cx, cy, r, blade = '#334155', speed = 'sr-spin' }: { cx: number; cy: number; r: number; blade?: string; speed?: string }) {
-  return (
-    <g transform={`translate(${cx} ${cy}) scale(1 0.46)`}>
-      <circle r={r} fill="#0f172a" />
-      <circle r={r} fill="none" stroke="#64748b" strokeWidth={1.4} />
-      <g className={speed}>
-        {[0, 120, 240].map((a) => (
-          <ellipse key={a} rx={r * 0.78} ry={r * 0.26} cx={r * 0.42} transform={`rotate(${a})`} fill={blade} />
-        ))}
-        <circle r={r * 0.2} fill="#94a3b8" />
-      </g>
-      {[0.45, 0.75].map((k) => (
-        <circle key={k} r={r * k} fill="none" stroke="#475569" strokeWidth={0.7} opacity={0.8} />
-      ))}
-    </g>
-  );
-}
-
-/** Cold-air streams that flow out of a unit on hover/focus. */
-function AirStreams({ paths }: { paths: string[] }) {
-  return (
-    <g className="sr-air" fill="none" stroke="#67e8f9" strokeWidth={2} strokeLinecap="round">
-      {paths.map((d, i) => (
-        <path key={i} d={d} style={{ animationDelay: `${i * 0.18}s` }} />
-      ))}
-    </g>
-  );
-}
-
-/* ============================================================================
-   Product illustrations: eight distinct units
-   ============================================================================ */
-
-function SplitInverterArt() {
-  const box = { x: 18, y: 84, w: 152, h: 46, d: 22 };
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      <rect x={14} y={34} width={170} height={6} rx={2} fill="#1e293b" opacity={0.55} />
-      <ObBox box={box} front="#f8fafc" top="#ffffff" side="#cbd5e1" />
-      {/* Curved fascia highlight + louver slot */}
-      <path d="M22 50 Q94 44 166 50" stroke="#e2e8f0" strokeWidth={2} fill="none" />
-      <rect x={28} y={72} width={132} height={7} rx={3.5} fill="#1e293b" />
-      <rect x={30} y={73.5} width={128} height={2} rx={1} fill="#475569" />
-      {/* Cyan display + badge */}
-      <rect x={128} y={54} width={26} height={11} rx={2} fill="#0b1f3a" />
-      <text x={141} y={62.5} textAnchor="middle" fontSize={8} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">24°</text>
-      <text x={30} y={63} fontSize={6.5} fontWeight={700} fill="#94a3b8" letterSpacing={1.2}>INVERTER</text>
-      <circle cx={122} cy={59.5} r={1.8} className="sr-blink" fill="#22d3ee" />
-      <AirStreams paths={['M45 90 q6 12 0 24', 'M80 90 q6 14 0 28', 'M115 90 q6 12 0 24', 'M148 90 q6 10 0 20']} />
-    </svg>
-  );
-}
-
-function SplitNonInverterArt() {
-  const box = { x: 22, y: 86, w: 142, h: 50, d: 26 };
-  const f = oblique(box);
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      <ObBox box={box} front="#e2e8f0" top="#f1f5f9" side="#94a3b8" />
-      {/* Intake slats on top face */}
-      {Array.from({ length: 9 }, (_, i) => {
-        const u = 0.08 + i * 0.105;
-        const [x1, y1] = f.onTop(u, 0.15);
-        const [x2, y2] = f.onTop(u, 0.85);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1.4} />;
-      })}
-      {/* Front horizontal grille + grey accent band */}
-      {[44, 49, 54].map((y) => (
-        <rect key={y} x={30} y={y} width={126} height={2.2} rx={1} fill="#cbd5e1" />
-      ))}
-      <rect x={22} y={62} width={142} height={6} fill="#64748b" />
-      <rect x={30} y={73} width={118} height={8} rx={2} fill="#334155" />
-      <circle cx={155} cy={76.5} r={2.2} className="sr-blink" fill="#22c55e" />
-      <text x={30} y={41} fontSize={6} fontWeight={700} fill="#64748b" letterSpacing={1}>STANDARD</text>
-      <AirStreams paths={['M50 92 q-6 12 0 24', 'M90 92 q-6 14 0 28', 'M130 92 q-6 12 0 24']} />
-    </svg>
-  );
-}
-
-function WindowInverterArt() {
-  const box = { x: 40, y: 124, w: 108, h: 80, d: 50 };
-  const sideX = 148;
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      <ObBox box={box} front="#f8fafc" top="#e2e8f0" side="#cbd5e1" />
-      {/* Rear condenser fins on side face */}
-      {Array.from({ length: 8 }, (_, i) => {
-        const t = 0.12 + i * 0.1;
-        const x = sideX + t * 30;
-        const y = 124 - t * 20;
-        return <line key={i} x1={x} y1={y - 6} x2={x} y2={y - 74} stroke="#94a3b8" strokeWidth={1.3} />;
-      })}
-      {/* Front intake grille (upper) */}
-      <rect x={48} y={52} width={72} height={36} rx={3} fill="#e2e8f0" />
-      {Array.from({ length: 7 }, (_, i) => (
-        <rect key={i} x={51} y={55 + i * 4.8} width={66} height={2} rx={1} fill="#94a3b8" />
-      ))}
-      {/* Louver discharge (lower) */}
-      <rect x={48} y={94} width={72} height={20} rx={3} fill="#1e293b" />
-      {[98, 103, 108].map((y) => (
-        <rect key={y} x={51} y={y} width={66} height={2} rx={1} fill="#64748b" />
-      ))}
-      {/* Control strip */}
-      <rect x={126} y={52} width={16} height={62} rx={3} fill="#e2e8f0" />
-      <rect x={128} y={56} width={12} height={8} rx={1.5} fill="#0b1f3a" />
-      <text x={134} y={62} textAnchor="middle" fontSize={5.5} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">22</text>
-      <circle cx={134} cy={76} r={4.2} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.8} />
-      <circle cx={134} cy={92} r={4.2} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.8} />
-      <line x1={134} y1={76} x2={134} y2={72.5} stroke="#334155" strokeWidth={1.2} />
-      <AirStreams paths={['M60 118 q-4 8 -12 12', 'M84 118 q0 8 -4 14', 'M108 118 q4 8 0 14']} />
-    </svg>
-  );
-}
-
-function FloorMountedArt() {
-  const box = { x: 74, y: 132, w: 50, h: 114, d: 24 };
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      <ellipse cx={108} cy={134} rx={44} ry={4} fill="#020617" opacity={0.4} />
-      <ObBox box={box} front="#f8fafc" top="#ffffff" side="#cbd5e1" />
-      {/* Gold accent + display */}
-      <rect x={74} y={26} width={50} height={3} fill="#d4a24c" />
-      <rect x={84} y={34} width={30} height={14} rx={3} fill="#0b1f3a" />
-      <text x={99} y={44} textAnchor="middle" fontSize={8.5} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">18°</text>
-      {/* Vertical swing louvers */}
-      <rect x={80} y={56} width={38} height={44} rx={4} fill="#1e293b" />
-      <g className="sr-sway">
-        {Array.from({ length: 6 }, (_, i) => (
-          <rect key={i} x={83 + i * 6} y={58} width={2.2} height={40} rx={1} fill="#64748b" />
-        ))}
-      </g>
-      {/* Lower return grille */}
-      {Array.from({ length: 6 }, (_, i) => (
-        <rect key={i} x={80} y={106 + i * 3.6} width={38} height={1.6} rx={0.8} fill="#cbd5e1" />
-      ))}
-      <AirStreams paths={['M70 70 q-14 -4 -26 6', 'M70 80 q-16 0 -30 10', 'M70 90 q-14 4 -24 14']} />
-    </svg>
-  );
-}
-
-function CeilingCassetteArt() {
-  const box = { x: 28, y: 108, w: 138, h: 16, d: 64 };
-  const f = oblique(box);
-  const quad = (u0: number, v0: number, u1: number, v1: number) =>
-    pts([f.onTop(u0, v0), f.onTop(u1, v0), f.onTop(u1, v1), f.onTop(u0, v1)]);
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      {/* Ceiling T-bar grid */}
-      <g stroke="#334155" strokeWidth={1} opacity={0.7}>
-        <line x1={6} y1={40} x2={194} y2={40} />
-        <line x1={30} y1={20} x2={18} y2={60} />
-        <line x1={190} y1={20} x2={178} y2={60} />
-      </g>
-      <ObBox box={box} front="#e2e8f0" top="#f8fafc" side="#cbd5e1" />
-      {/* Four discharge slots around centre grille */}
-      <polygon points={quad(0.1, 0.08, 0.9, 0.2)} fill="#1e293b" />
-      <polygon points={quad(0.1, 0.8, 0.9, 0.92)} fill="#1e293b" />
-      <polygon points={quad(0.04, 0.24, 0.12, 0.76)} fill="#1e293b" />
-      <polygon points={quad(0.88, 0.24, 0.96, 0.76)} fill="#1e293b" />
-      <polygon points={quad(0.26, 0.3, 0.74, 0.7)} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={0.8} />
-      {Array.from({ length: 6 }, (_, i) => {
-        const u = 0.3 + i * 0.08;
-        const [x1, y1] = f.onTop(u, 0.33);
-        const [x2, y2] = f.onTop(u, 0.67);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#94a3b8" strokeWidth={1} />;
-      })}
-      <circle cx={f.onTop(0.82, 0.5)[0]} cy={f.onTop(0.82, 0.5)[1]} r={1.8} className="sr-blink" fill="#22d3ee" />
-      <AirStreams paths={['M40 112 q-8 10 -16 14', 'M100 112 q0 10 0 18', 'M160 112 q8 10 16 14']} />
-    </svg>
-  );
-}
-
-function DuctedArt() {
-  const box = { x: 14, y: 110, w: 112, h: 40, d: 44 };
-  const duct = { x: 126, y: 100, w: 58, h: 26, d: 30 };
-  const f = oblique(duct);
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      {/* Hanger rods */}
-      {[30, 110].map((x) => (
-        <line key={x} x1={x} y1={6} x2={x} y2={70} stroke="#475569" strokeWidth={1.6} />
-      ))}
-      <ObBox box={box} front="#94a3b8" top="#cbd5e1" side="#64748b" />
-      {/* Access panel + rating plate */}
-      <rect x={22} y={78} width={56} height={26} rx={1.5} fill="#a8b5c6" stroke="#64748b" strokeWidth={0.8} />
-      {[22, 78].map((x) => (
-        <circle key={x} cx={x + (x === 22 ? 3 : -3)} cy={81} r={1.1} fill="#475569" />
-      ))}
-      <rect x={86} y={80} width={30} height={12} rx={1} fill="#e2e8f0" />
-      <rect x={89} y={83} width={18} height={1.6} fill="#64748b" />
-      <rect x={89} y={86.5} width={12} height={1.6} fill="#64748b" />
-      {/* Insulated supply duct with foil ribs */}
-      <ObBox box={duct} front="#cbd5e1" top="#e2e8f0" side="#94a3b8" />
-      {[0.2, 0.4, 0.6, 0.8].map((u) => {
-        const [x1, y1] = f.onTop(u, 0);
-        const [x2, y2] = f.onTop(u, 1);
-        return (
-          <g key={u} stroke="#94a3b8" strokeWidth={1}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} />
-            <line x1={x1} y1={y1} x2={x1} y2={y1 + 26} />
-          </g>
-        );
-      })}
-      <AirStreams paths={['M190 82 q6 0 8 -4', 'M190 92 q6 0 8 0', 'M190 102 q6 0 8 4']} />
-    </svg>
-  );
-}
-
-function RooftopPackagedArt() {
-  const box = { x: 18, y: 120, w: 146, h: 60, d: 50 };
-  const f = oblique(box);
-  const fan1 = f.onTop(0.3, 0.5);
-  const fan2 = f.onTop(0.72, 0.5);
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      {/* Roof curb rail */}
-      <rect x={14} y={120} width={154} height={8} fill="#334155" />
-      <ObBox box={box} front="#e5e7eb" top="#f3f4f6" side="#9ca3af" />
-      <TopFan cx={fan1[0]} cy={fan1[1]} r={19} />
-      <TopFan cx={fan2[0]} cy={fan2[1]} r={19} />
-      {/* Condenser coil section (left) */}
-      <rect x={24} y={66} width={62} height={48} rx={2} fill="#cbd5e1" />
-      {Array.from({ length: 14 }, (_, i) => (
-        <line key={i} x1={27 + i * 4.3} y1={68} x2={27 + i * 4.3} y2={112} stroke="#64748b" strokeWidth={1} />
-      ))}
-      {/* Access panels (right) */}
-      {[92, 126].map((x) => (
-        <g key={x}>
-          <rect x={x} y={66} width={30} height={48} rx={2} fill="#e5e7eb" stroke="#9ca3af" strokeWidth={0.9} />
-          <rect x={x + 24} y={86} width={2.4} height={9} rx={1} fill="#475569" />
-        </g>
-      ))}
-      <rect x={96} y={70} width={14} height={5} rx={1} fill="#f97316" />
-    </svg>
-  );
-}
-
-function VrfArt() {
-  const left = { x: 22, y: 128, w: 64, h: 92, d: 34 };
-  const right = { x: 96, y: 128, w: 64, h: 92, d: 34 };
-  const fl = oblique(left);
-  const fr = oblique(right);
-  const grille = (x: number) => (
     <g>
-      <rect x={x + 6} y={58} width={52} height={50} rx={2} fill="#cbd5e1" />
-      {Array.from({ length: 9 }, (_, i) => (
-        <rect key={i} x={x + 8} y={61 + i * 5.2} width={48} height={2} rx={1} fill="#94a3b8" />
-      ))}
-      <rect x={x + 6} y={114} width={20} height={6} rx={1} fill="#0b1f3a" />
-      <text x={x + 16} y={118.8} textAnchor="middle" fontSize={4.6} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">VRF</text>
+      {castShadow && (
+        <g transform={FLOOR_M}>
+          <rect x={x + 4} y={y - 2} width={w + 22} height={d + 10} rx={12} fill="#020617" opacity={0.3} filter="url(#sr-blur)" />
+        </g>
+      )}
+      <g transform={mat(P(x + w, y + d, z + h), AYN, AZN)}>
+        <rect width={d} height={h} fill={shade(color, -0.22)} {...EDGE} />
+        {right}
+        <rect width={d} height={h} fill="url(#sr-g-right)" />
+      </g>
+      <g transform={mat(P(x, y + d, z + h), AX, AZN)}>
+        <rect width={w} height={h} fill={color} {...EDGE} />
+        {left}
+        <rect width={w} height={h} fill="url(#sr-g-left)" />
+      </g>
+      <g transform={mat(P(x, y, z + h), AX, AY)}>
+        <rect width={w} height={d} fill={shade(color, 0.2)} {...EDGE} />
+        {top}
+        <rect width={w} height={d} fill="url(#sr-g-top)" />
+      </g>
     </g>
-  );
-  return (
-    <svg viewBox="0 0 200 140" aria-hidden="true">
-      <ObBox box={left} front="#f1f5f9" top="#f8fafc" side="#94a3b8" />
-      <TopFan cx={fl.onTop(0.5, 0.5)[0]} cy={fl.onTop(0.5, 0.5)[1]} r={21} speed="sr-spin sr-spin--b" />
-      {grille(22)}
-      <ObBox box={right} front="#f1f5f9" top="#f8fafc" side="#94a3b8" />
-      <TopFan cx={fr.onTop(0.5, 0.5)[0]} cy={fr.onTop(0.5, 0.5)[1]} r={21} />
-      {grille(96)}
-    </svg>
   );
 }
 
-const ART: Record<string, () => ReactNode> = {
-  res_split_inv: SplitInverterArt,
-  res_split_non_inv: SplitNonInverterArt,
-  res_window_inv: WindowInverterArt,
-  res_floor_mounted: FloorMountedArt,
-  com_cassette: CeilingCassetteArt,
-  com_ducted: DuctedArt,
-  com_packaged: RooftopPackagedArt,
-  com_vrf: VrfArt,
-};
+/* ── Small drawing primitives (local face coords) ── */
 
-const LEFT_IDS = ['res_split_inv', 'res_split_non_inv', 'res_window_inv', 'res_floor_mounted'];
-const RIGHT_IDS = ['com_cassette', 'com_ducted', 'com_packaged', 'com_vrf'];
+function Slats({ x, y, w, h, gap, color, vertical = false, sw = 1.2 }: { x: number; y: number; w: number; h: number; gap: number; color: string; vertical?: boolean; sw?: number }) {
+  const n = Math.floor((vertical ? w : h) / gap);
+  return (
+    <g stroke={color} strokeWidth={sw}>
+      {Array.from({ length: n }, (_, i) =>
+        vertical ? (
+          <line key={i} x1={x + gap * (i + 0.5)} y1={y} x2={x + gap * (i + 0.5)} y2={y + h} />
+        ) : (
+          <line key={i} x1={x} y1={y + gap * (i + 0.5)} x2={x + w} y2={y + gap * (i + 0.5)} />
+        ),
+      )}
+    </g>
+  );
+}
+
+function Fan({ cx, cy, r, blade = '#475569', cls = 'sr-spin' }: { cx: number; cy: number; r: number; blade?: string; cls?: string }) {
+  return (
+    <g transform={`translate(${cx} ${cy})`}>
+      <circle r={r} fill="#0b1220" />
+      <g className={cls}>
+        {[0, 120, 240].map((a) => (
+          <path
+            key={a}
+            d={`M0 0 C ${r * 0.2} ${-r * 0.55}, ${r * 0.75} ${-r * 0.62}, ${r * 0.88} ${-r * 0.2} C ${r * 0.6} ${-r * 0.08}, ${r * 0.3} 0, 0 0 Z`}
+            transform={`rotate(${a})`}
+            fill={blade}
+          />
+        ))}
+      </g>
+      <circle r={r * 0.16} fill="#94a3b8" />
+      <g fill="none" stroke="#64748b" strokeWidth={0.9}>
+        {[0.38, 0.64, 0.9].map((k) => (
+          <circle key={k} r={r * k} />
+        ))}
+        <circle r={r} stroke="#94a3b8" strokeWidth={1.6} />
+        {[0, 45, 90, 135].map((a) => (
+          <line key={a} x1={-r} x2={r} transform={`rotate(${a})`} strokeWidth={0.6} />
+        ))}
+      </g>
+    </g>
+  );
+}
 
 /* ============================================================================
-   Product tile → turns into a full card on hover / focus / tap
+   Hover / focus → product card
    ============================================================================ */
 
-function ProductCard({ item, align }: { item: EquipmentItem; align: 'left' | 'right' }) {
+type Zone = 'left' | 'right';
+
+interface HotMeta {
+  id: string;
+  catalogId: string;
+  variant: string;
+  zone: Zone;
+  anchor: Pt;
+}
+
+interface HotCtx {
+  active: HotMeta | null;
+  open: (m: HotMeta) => void;
+  scheduleClose: () => void;
+  cancelClose: () => void;
+}
+
+const HotContext = createContext<HotCtx | null>(null);
+
+function Hot({ meta, children }: { meta: HotMeta; children: ReactNode }) {
+  const ctx = useContext(HotContext)!;
+  const item = EQUIPMENT_CATALOG.find((e) => e.id === meta.catalogId);
+  const isActive = ctx.active?.id === meta.id;
+  const onKey = (e: KeyboardEvent<SVGGElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      ctx.open(meta);
+    }
+  };
+  return (
+    <g
+      className={`sr-item${isActive ? ' is-active' : ''}`}
+      data-accent={item?.audience === 'commercial' ? 'amber' : 'cyan'}
+      tabIndex={0}
+      role="button"
+      aria-label={`${meta.variant}: ${item?.nameEn ?? ''}. Show details`}
+      aria-expanded={isActive}
+      onMouseEnter={() => ctx.open(meta)}
+      onMouseLeave={ctx.scheduleClose}
+      onFocus={() => ctx.open(meta)}
+      onBlur={ctx.scheduleClose}
+      onClick={() => ctx.open(meta)}
+      onKeyDown={onKey}
+    >
+      {children}
+    </g>
+  );
+}
+
+function ProductPopover({ meta, onClose }: { meta: HotMeta; onClose: () => void }) {
+  const ctx = useContext(HotContext)!;
   const language = useHVACStore((s) => s.language);
   const enterExperience = useHVACStore((s) => s.enterExperience);
   const setSelectedEquipmentId = useHVACStore((s) => s.setSelectedEquipmentId);
   const setQuoteModalOpen = useHVACStore((s) => s.setQuoteModalOpen);
-  const Art = ART[item.id];
+  const item = EQUIPMENT_CATALOG.find((e) => e.id === meta.catalogId);
+  if (!item) return null;
   const en = language === 'en';
-  const accent = item.audience === 'residential' ? 'cyan' : 'amber';
+  const accent = item.audience === 'commercial' ? 'amber' : 'cyan';
 
   return (
-    <div className="sr-unit" data-accent={accent} data-align={align}>
-      <div
-        className="sr-unit-card"
-        tabIndex={0}
-        role="group"
-        aria-label={`${en ? item.nameEn : item.nameTaglish}: ${item.capacityRange}`}
-      >
-        <div className="sr-unit-art">
-          <Art />
+    <div
+      className="sr-pop"
+      data-zone={meta.zone}
+      data-accent={accent}
+      role="dialog"
+      aria-label={en ? item.nameEn : item.nameTaglish}
+      style={{ left: `${(meta.anchor[0] / VB_W) * 100}%`, top: `${(meta.anchor[1] / VB_H) * 100}%` }}
+      onMouseEnter={ctx.cancelClose}
+      onMouseLeave={ctx.scheduleClose}
+      onFocus={ctx.cancelClose}
+      onBlur={ctx.scheduleClose}
+    >
+      <button type="button" className="sr-pop-close" onClick={onClose} aria-label={en ? 'Close' : 'Isara'}>
+        <X className="w-3.5 h-3.5" aria-hidden="true" />
+      </button>
+      <p className="sr-pop-eyebrow">
+        {item.audience === 'commercial' ? (en ? 'Commercial' : 'Pang-negosyo') : en ? 'Residential' : 'Pambahay'} · {meta.variant}
+      </p>
+      <h3 className="mt-1 pr-6 font-display text-[15px] font-bold leading-snug text-white">
+        {en ? item.nameEn : item.nameTaglish}
+      </h3>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <span className="sr-chip">{item.capacityRange.split(' (')[0]}</span>
+        {item.inverter && <span className="sr-chip sr-chip--ok">Inverter</span>}
+        <span className="sr-chip sr-chip--muted">{item.noiseDba.split(' (')[0]}</span>
+      </div>
+      <dl className="mt-2.5 space-y-1.5 text-[12px] leading-snug text-slate-300">
+        <div>
+          <dt className="sr-dt">{en ? 'Best for' : 'Bagay sa'}</dt>
+          <dd>{en ? item.bestForEn : item.bestForTaglish}</dd>
         </div>
-        <p className="sr-unit-name">{en ? item.nameEn : item.nameTaglish}</p>
-
-        <div className="sr-unit-info">
-          <div className="sr-unit-info-inner">
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              <span className="sr-chip">{item.capacityRange.split(' (')[0]}</span>
-              {item.inverter && <span className="sr-chip sr-chip--ok">Inverter</span>}
-            </div>
-            <dl className="mt-2 space-y-1.5 text-[11.5px] leading-snug text-slate-300">
-              <div>
-                <dt className="sr-dt">{en ? 'Best for' : 'Bagay sa'}</dt>
-                <dd>{en ? item.bestForEn : item.bestForTaglish}</dd>
-              </div>
-              <div>
-                <dt className="sr-dt">{en ? 'Noise' : 'Ingay'}</dt>
-                <dd>{item.noiseDba}</dd>
-              </div>
-              <div>
-                <dt className="sr-dt">{en ? 'Indicative price' : 'Tinatayang presyo'}</dt>
-                <dd className="font-semibold text-white">{item.priceEstimatePhp}</dd>
-              </div>
-            </dl>
-            <div className="mt-3 grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                className="sr-btn sr-btn--ghost"
-                onClick={() => {
-                  enterExperience(item.audience, { service: 'equipment' });
-                  setSelectedEquipmentId(item.id);
-                }}
-              >
-                {en ? 'View in 3D' : 'Tingnan sa 3D'}
-              </button>
-              <button type="button" className="sr-btn sr-btn--solid" onClick={() => setQuoteModalOpen(true)}>
-                {en ? 'Get quote' : 'Magpa-quote'}
-              </button>
-            </div>
-          </div>
+        <div>
+          <dt className="sr-dt">{en ? 'Why choose it' : 'Bakit ito'}</dt>
+          <dd>{en ? item.notesEn : item.notesTaglish}</dd>
         </div>
+        <div>
+          <dt className="sr-dt">{en ? 'Indicative price' : 'Tinatayang presyo'}</dt>
+          <dd className="font-semibold text-white">{item.priceEstimatePhp}</dd>
+        </div>
+      </dl>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className="sr-btn sr-btn--ghost"
+          onClick={() => {
+            enterExperience(item.audience, { service: 'equipment' });
+            setSelectedEquipmentId(item.id);
+          }}
+        >
+          {en ? 'View in 3D' : 'Tingnan sa 3D'}
+        </button>
+        <button type="button" className="sr-btn sr-btn--solid" onClick={() => setQuoteModalOpen(true)}>
+          {en ? 'Get a quote' : 'Magpa-quote'}
+        </button>
       </div>
     </div>
   );
 }
 
 /* ============================================================================
-   Centre workshop: animated isometric scene with technicians at work
+   Aircon units
    ============================================================================ */
 
-const ISO_X = 0.866;
-const ISO_Y = 0.5;
-
-function IsoBox({
-  x,
-  y,
-  w,
-  d,
-  h,
-  top,
-  left,
-  right,
-  className,
-}: {
-  x: number;
-  y: number;
-  w: number;
-  d: number;
-  h: number;
-  top: string;
-  left: string;
-  right: string;
-  className?: string;
-}) {
-  const R: Pt = [w * ISO_X, -w * ISO_Y];
-  const L: Pt = [-d * ISO_X, -d * ISO_Y];
-  const up = (a: Pt[]) => pts(a.map(([px, py]) => [px, py - h] as Pt));
-  const P: Pt = [x, y];
-  const PR: Pt = [x + R[0], y + R[1]];
-  const PL: Pt = [x + L[0], y + L[1]];
-  const PRL: Pt = [x + R[0] + L[0], y + R[1] + L[1]];
-  return (
-    <g className={className} stroke="rgba(2,6,23,0.35)" strokeWidth={0.8} strokeLinejoin="round">
-      <polygon points={pts([P, PL, [PL[0], PL[1] - h], [P[0], P[1] - h]])} fill={left} />
-      <polygon points={pts([P, PR, [PR[0], PR[1] - h], [P[0], P[1] - h]])} fill={right} />
-      <polygon points={up([P, PR, PRL, PL])} fill={top} />
+/** Wall-mounted split, mounted on the pegboard. Its front is the +x face. */
+function WallSplit({ x, y, z, d, h, body, style }: { x: number; y: number; z: number; d: number; h: number; body: string; style: 'premium' | 'standard' | 'onyx' | 'slim' }) {
+  const dark = style === 'onyx';
+  const right = (
+    <g>
+      {style === 'premium' && <path d={`M4 ${h * 0.2} Q${d / 2} ${h * 0.05} ${d - 4} ${h * 0.2}`} stroke="#ffffff" strokeOpacity={0.9} strokeWidth={1.4} fill="none" />}
+      {style === 'standard' && <Slats x={6} y={4} w={d - 12} h={h * 0.38} gap={3.4} color="#cbd5e1" />}
+      {style === 'slim' && <rect x={0} y={h * 0.42} width={d} height={3} fill="#94a3b8" />}
+      {style === 'standard' && <rect x={0} y={h * 0.5} width={d} height={4} fill="#64748b" />}
+      <rect x={5} y={h - 10} width={d - 10} height={6} rx={3} fill={dark ? '#000000' : '#1f2937'} />
+      <rect x={7} y={h - 8.8} width={d - 14} height={1.6} rx={0.8} fill={dark ? '#334155' : '#64748b'} />
+      <rect x={d - 30} y={h * 0.28} width={18} height={8} rx={1.5} fill="#0b1f3a" />
+      <text x={d - 21} y={h * 0.28 + 6.2} textAnchor="middle" fontSize={6} fontWeight={700} fill={style === 'standard' ? '#4ade80' : '#22d3ee'} fontFamily="ui-monospace,monospace">
+        {style === 'standard' ? 'ON' : '24°'}
+      </text>
+      <circle cx={d - 35} cy={h * 0.28 + 4} r={1.3} className="sr-blink" fill={style === 'standard' ? '#22c55e' : '#22d3ee'} />
+      <text x={7} y={h * 0.38} fontSize={5} fontWeight={800} letterSpacing={1} fill={dark ? '#64748b' : '#94a3b8'}>
+        APEX
+      </text>
     </g>
+  );
+  const top = <Slats x={3} y={4} w={24} h={d - 8} gap={4} color={dark ? '#1f2937' : '#cbd5e1'} />;
+  return <Block x={x} y={y} z={z} w={28} d={d} h={h} color={body} right={right} top={top} />;
+}
+
+function OutdoorUnit({ x, y, w, d, h }: { x: number; y: number; w: number; d: number; h: number }) {
+  return (
+    <Block
+      x={x}
+      y={y}
+      w={w}
+      d={d}
+      h={h}
+      color="#e5e9ef"
+      right={
+        <g>
+          <Fan cx={d * 0.42} cy={h * 0.5} r={Math.min(d, h) * 0.36} cls="sr-spin sr-spin--fast" />
+          <rect x={d * 0.82} y={6} width={d * 0.14} height={h - 12} rx={1.5} fill="#cbd5e1" />
+          <Slats x={d * 0.83} y={8} w={d * 0.12} h={h - 16} gap={4} color="#94a3b8" />
+        </g>
+      }
+      left={<Slats x={4} y={6} w={w - 8} h={h - 12} gap={3} color="#94a3b8" vertical sw={0.9} />}
+      top={<Slats x={4} y={4} w={w - 8} h={d - 8} gap={6} color="#cbd5e1" />}
+    />
   );
 }
 
-/** A stylised technician. Arm groups pivot at the shoulder (local 0,0). */
+function FloorTower() {
+  const d = 52;
+  const h = 170;
+  return (
+    <Block
+      x={20}
+      y={345}
+      w={30}
+      d={d}
+      h={h}
+      color="#f4f6f9"
+      right={
+        <g>
+          <rect x={0} y={16} width={d} height={3} fill="#d4a24c" />
+          <rect x={11} y={26} width={30} height={13} rx={3} fill="#0b1f3a" />
+          <text x={26} y={35.5} textAnchor="middle" fontSize={8} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">18°</text>
+          <rect x={7} y={48} width={38} height={60} rx={5} fill="#1f2937" />
+          <g className="sr-sway">
+            <Slats x={9} y={50} w={34} h={56} gap={5.5} color="#64748b" vertical sw={2} />
+          </g>
+          <Slats x={8} y={118} w={36} h={44} gap={4} color="#cbd5e1" />
+        </g>
+      }
+    />
+  );
+}
+
+/** Window-type unit. Its front is the +y (left) face. */
+function WindowUnit({ x, y, z, body = '#f4f6f9', grille = 'h', display = false, w = 80, d = 60, h = 58 }: { x: number; y: number; z: number; body?: string; grille?: 'h' | 'v' | 'mesh'; display?: boolean; w?: number; d?: number; h?: number }) {
+  const gw = w - 26;
+  const left = (
+    <g>
+      <rect x={5} y={5} width={gw} height={h * 0.48} rx={2} fill={shade(body, -0.07)} />
+      {grille === 'h' && <Slats x={7} y={6} w={gw - 4} h={h * 0.46} gap={3.6} color="#94a3b8" />}
+      {grille === 'v' && <Slats x={6} y={7} w={gw - 2} h={h * 0.44} gap={3.6} color="#94a3b8" vertical />}
+      {grille === 'mesh' && (
+        <>
+          <Slats x={7} y={6} w={gw - 4} h={h * 0.46} gap={4} color="#a3b1c2" sw={0.7} />
+          <Slats x={6} y={7} w={gw - 2} h={h * 0.44} gap={4} color="#a3b1c2" vertical sw={0.7} />
+        </>
+      )}
+      <rect x={5} y={h * 0.58} width={gw} height={h * 0.3} rx={2} fill="#1f2937" />
+      <Slats x={7} y={h * 0.6} w={gw - 4} h={h * 0.26} gap={4.5} color="#64748b" sw={1.4} />
+      <rect x={w - 18} y={5} width={13} height={h - 10} rx={2} fill={shade(body, -0.05)} />
+      {display ? (
+        <>
+          <rect x={w - 16.5} y={8} width={10} height={7} rx={1} fill="#0b1f3a" />
+          <text x={w - 11.5} y={13.6} textAnchor="middle" fontSize={5} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">22</text>
+        </>
+      ) : (
+        <circle cx={w - 11.5} cy={13} r={3.6} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.7} />
+      )}
+      <circle cx={w - 11.5} cy={h * 0.5} r={3.6} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.7} />
+      <line x1={w - 11.5} y1={h * 0.5} x2={w - 11.5} y2={h * 0.5 - 3} stroke="#334155" strokeWidth={1} />
+      <text x={w - 11.5} y={h - 8} textAnchor="middle" fontSize={3.6} fontWeight={800} fill="#94a3b8">APEX</text>
+    </g>
+  );
+  const right = <Slats x={5} y={6} w={d - 10} h={h - 12} gap={3.2} color={shade(body, -0.3)} vertical sw={0.9} />;
+  return <Block x={x} y={y} z={z} w={w} d={d} h={h} color={body} left={left} right={right} shadow={z === 0} />;
+}
+
+function Pallet({ x, y, z = 0, w, d }: { x: number; y: number; z?: number; w: number; d: number }) {
+  const gaps = (len: number) =>
+    [0.2, 0.62].map((t) => <rect key={t} x={len * t} y={3} width={len * 0.18} height={5} fill="#3f2a17" />);
+  return (
+    <Block
+      x={x}
+      y={y}
+      z={z}
+      w={w}
+      d={d}
+      h={10}
+      color="#a8743f"
+      left={gaps(w)}
+      right={gaps(d)}
+      top={<Slats x={0} y={0} w={w} h={d} gap={d / 6} color="#7c5229" sw={1.4} />}
+    />
+  );
+}
+
+/* ============================================================================
+   People
+   ============================================================================ */
+
 function Technician({
   x,
   y,
   flip = false,
+  scale = 1.3,
   armLeft,
   armRight,
   armLeftClass,
@@ -462,11 +404,11 @@ function Technician({
   bodyClass = 'sr-breathe',
   legClass,
   prop,
-  shirt = '#1d4ed8',
 }: {
   x: number;
   y: number;
   flip?: boolean;
+  scale?: number;
   armLeft: number;
   armRight: number;
   armLeftClass?: string;
@@ -475,51 +417,49 @@ function Technician({
   bodyClass?: string;
   legClass?: [string, string];
   prop?: ReactNode;
-  shirt?: string;
 }) {
+  const leg = (fill: string) => (
+    <>
+      <rect x={-3.8} y={0} width={7.6} height={30} rx={3.4} fill={fill} />
+      <path d="M-4.4 26 h10.6 a3 3 0 0 1 3 3 v2.4 h-13.6 z" fill="#111827" />
+    </>
+  );
   return (
-    <g transform={`translate(${x} ${y}) scale(${flip ? -1 : 1} 1)`}>
-      <ellipse cx={0} cy={2} rx={16} ry={5} fill="#020617" opacity={0.45} />
-      {/* Legs */}
+    <g transform={`translate(${x} ${y}) scale(${flip ? -scale : scale} ${scale})`}>
+      <ellipse cx={2} cy={2} rx={17} ry={4.5} fill="#020617" opacity={0.4} filter="url(#sr-soft)" />
       <g transform="translate(-5 -30)">
-        <g className={legClass?.[0]}>
-          <rect x={-3.5} y={0} width={7} height={30} rx={3} fill="#0f2a4a" />
-          <rect x={-4} y={26} width={9} height={5} rx={2} fill="#111827" />
-        </g>
+        <g className={legClass?.[0]}>{leg('#16365c')}</g>
       </g>
       <g transform="translate(5 -30)">
-        <g className={legClass?.[1]}>
-          <rect x={-3.5} y={0} width={7} height={30} rx={3} fill="#12355d" />
-          <rect x={-4} y={26} width={9} height={5} rx={2} fill="#111827" />
-        </g>
+        <g className={legClass?.[1]}>{leg('url(#sr-pants)')}</g>
       </g>
       <g className={bodyClass}>
-        {/* Back arm */}
         <g transform="translate(-9 -56)">
-          <g className={armLeftClass} style={{ transform: armLeftClass ? undefined : `rotate(${armLeft}deg)` }}>
-            <rect x={-3.2} y={0} width={6.4} height={24} rx={3.2} fill={shirt} style={{ filter: 'brightness(0.8)' }} />
-            <circle cx={0} cy={25} r={3.6} fill="#c68b59" />
+          <g className={armLeftClass} style={armLeftClass ? undefined : { transform: `rotate(${armLeft}deg)` }}>
+            <rect x={-3.4} y={0} width={6.8} height={23} rx={3.4} fill="#1e3a8a" />
+            <circle cx={0} cy={24} r={3.6} fill="#a86f45" />
           </g>
         </g>
-        {/* Torso */}
-        <rect x={-11} y={-60} width={22} height={32} rx={7} fill={shirt} />
-        <rect x={-11} y={-36} width={22} height={5} fill="#0f172a" opacity={0.55} />
-        <rect x={2} y={-55} width={6} height={4} rx={1} fill="#22d3ee" opacity={0.9} />
-        {/* Head */}
+        <rect x={-11.5} y={-60} width={23} height={32} rx={7.5} fill="url(#sr-uniform)" />
+        <path d="M-4 -60 L0 -54 L4 -60" fill="none" stroke="#bfdbfe" strokeWidth={1.1} />
+        <rect x={-11.5} y={-35} width={23} height={4.5} fill="#0f172a" />
+        <rect x={-2} y={-35} width={4} height={4.5} fill="#cbd5e1" />
+        <rect x={3} y={-54} width={6} height={4} rx={1} fill="#22d3ee" />
         <g transform="translate(0 -68)">
           <g className={headClass}>
-            <rect x={-3} y={4} width={6} height={6} fill="#b97a4c" />
-            <circle cx={0} cy={0} r={8} fill="#c68b59" />
-            <path d="M-8.5 -1 Q0 -13 8.5 -1 Z" fill="#0b1f3a" />
-            <rect x={2} y={-3} width={10} height={3} rx={1.5} fill="#0b1f3a" />
-            <circle cx={3.5} cy={1} r={1} fill="#1e293b" />
+            <rect x={-3} y={4} width={6} height={6} fill="#94603b" />
+            <circle cx={0} cy={0} r={8} fill="url(#sr-skin)" />
+            <path d="M-8.6 -0.5 Q-8 -11 0 -11 Q8 -11 8.6 -0.5 Z" fill="#1e3a8a" />
+            <rect x={2} y={-3.2} width={10.5} height={3} rx={1.5} fill="#172554" />
+            <circle cx={-1} cy={-6} r={1.6} fill="#22d3ee" />
+            <circle cx={4} cy={1} r={0.95} fill="#1e293b" />
+            <path d="M3 4.4 q2 1 3.6 -0.2" stroke="#6b3f22" strokeWidth={0.7} fill="none" />
           </g>
         </g>
-        {/* Front arm */}
         <g transform="translate(9 -56)">
-          <g className={armRightClass} style={{ transform: armRightClass ? undefined : `rotate(${armRight}deg)` }}>
-            <rect x={-3.2} y={0} width={6.4} height={24} rx={3.2} fill={shirt} />
-            <circle cx={0} cy={25} r={3.6} fill="#c68b59" />
+          <g className={armRightClass} style={armRightClass ? undefined : { transform: `rotate(${armRight}deg)` }}>
+            <rect x={-3.4} y={0} width={6.8} height={23} rx={3.4} fill="#2563eb" />
+            <circle cx={0} cy={24} r={3.6} fill="#b97a4c" />
             {prop}
           </g>
         </g>
@@ -541,14 +481,99 @@ function Gauge({ cx, cy, r, color, needleClass }: { cx: number; cy: number; r: n
   );
 }
 
-function WorkshopScene() {
+function Cylinder({ x, y, h, r, grad, valve = '#334155' }: { x: number; y: number; h: number; r: number; grad: string; valve?: string }) {
   return (
-    <svg viewBox="0 0 600 440" className="w-full h-auto" role="img" aria-label="Apex technicians at work: diagnosing an outdoor unit, running a system scan, and planning service schedules">
+    <g transform={`translate(${x} ${y})`}>
+      <ellipse cx={4} cy={1} rx={r + 6} ry={4} fill="#020617" opacity={0.35} filter="url(#sr-soft)" />
+      <path d={`M${-r} 0 V${-h + r} A ${r} ${r * 0.9} 0 0 1 ${r} ${-h + r} V0 A ${r} ${r * 0.35} 0 0 1 ${-r} 0 Z`} fill={`url(#${grad})`} />
+      <rect x={-r * 0.35} y={-h - 6} width={r * 0.7} height={8} rx={1.5} fill={valve} />
+      <rect x={-r * 0.6} y={-h - 9} width={r * 1.2} height={3} rx={1.5} fill="#64748b" />
+      <rect x={-r} y={-h * 0.45} width={r * 2} height={6} fill="#ffffff" opacity={0.22} />
+    </g>
+  );
+}
+
+/* ============================================================================
+   Scene
+   ============================================================================ */
+
+function ShowroomScene() {
+  // Hoverable product placements
+  const H = {
+    u1: { id: 'u1', catalogId: 'res_split_inv', variant: '1.5 HP Premium White', zone: 'left' as Zone, anchor: P(44, 620, 232) },
+    u2: { id: 'u2', catalogId: 'res_split_non_inv', variant: '1.0 HP Standard', zone: 'left' as Zone, anchor: P(44, 465, 228) },
+    u3: { id: 'u3', catalogId: 'res_split_inv', variant: '2.0 HP Onyx Black', zone: 'left' as Zone, anchor: P(44, 616, 160) },
+    u4: { id: 'u4', catalogId: 'res_split_non_inv', variant: '1.5 HP Slim', zone: 'left' as Zone, anchor: P(44, 452, 158) },
+    u5: { id: 'u5', catalogId: 'res_floor_mounted', variant: '3.0 HP Tower', zone: 'left' as Zone, anchor: P(50, 371, 172) },
+    c1: { id: 'c1', catalogId: 'com_vrf', variant: '10 HP Outdoor Module', zone: 'left' as Zone, anchor: P(245, 360, 152) },
+    c2: { id: 'c2', catalogId: 'com_packaged', variant: '7.5 TR Packaged', zone: 'right' as Zone, anchor: P(540, 145, 192) },
+    w1: { id: 'w1', catalogId: 'res_window_inv', variant: '1.5 HP Digital', zone: 'right' as Zone, anchor: P(695, 170, 128) },
+    w2: { id: 'w2', catalogId: 'res_window_inv', variant: '1.0 HP Manual', zone: 'right' as Zone, anchor: P(695, 170, 70) },
+    w3: { id: 'w3', catalogId: 'res_window_inv', variant: '2.0 HP Mesh Grille', zone: 'right' as Zone, anchor: P(745, 290, 70) },
+    w4: { id: 'w4', catalogId: 'res_window_inv', variant: '0.75 HP Compact', zone: 'right' as Zone, anchor: P(745, 40, 70) },
+    w5: { id: 'w5', catalogId: 'res_window_inv', variant: '1.5 HP Beige', zone: 'right' as Zone, anchor: P(742, 40, 170) },
+    w6: { id: 'w6', catalogId: 'res_window_inv', variant: '1.0 HP Digital', zone: 'right' as Zone, anchor: P(642, 40, 270) },
+    w7: { id: 'w7', catalogId: 'res_window_inv', variant: '2.0 HP Mesh Grille', zone: 'right' as Zone, anchor: P(742, 40, 270) },
+    r3: { id: 'r3', catalogId: 'com_ducted', variant: '5 HP Ducted Indoor', zone: 'right' as Zone, anchor: P(642, 38, 140) },
+    r4: { id: 'r4', catalogId: 'com_cassette', variant: '3 HP 4-Way Cassette', zone: 'right' as Zone, anchor: P(560, 560, 40) },
+  };
+
+  const rackUprightsX = [590, 692, 792];
+  const deckZ = [100, 200];
+
+  return (
+    <svg viewBox={`0 0 ${VB_W} ${VB_H}`} className="block w-full h-auto" role="img" aria-label="Apex aircon showroom: wall-mounted split units on the left, window-type and commercial units on the right, and technicians at work in the centre">
       <defs>
-        <radialGradient id="sr-floor-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.22} />
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+        <filter id="sr-blur" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="7" />
+        </filter>
+        <filter id="sr-soft" x="-30%" y="-60%" width="160%" height="220%">
+          <feGaussianBlur stdDeviation="2" />
+        </filter>
+        <linearGradient id="sr-g-top" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.3} />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity={0.04} />
+        </linearGradient>
+        <linearGradient id="sr-g-left" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.12} />
+          <stop offset="100%" stopColor="#0f172a" stopOpacity={0.14} />
+        </linearGradient>
+        <linearGradient id="sr-g-right" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0f172a" stopOpacity={0.06} />
+          <stop offset="100%" stopColor="#0f172a" stopOpacity={0.3} />
+        </linearGradient>
+        <radialGradient id="sr-floor" cx="45%" cy="40%" r="75%">
+          <stop offset="0%" stopColor="#e7edf4" />
+          <stop offset="60%" stopColor="#c7d2df" />
+          <stop offset="100%" stopColor="#8d9db2" />
         </radialGradient>
+        <pattern id="sr-peg" width="10" height="10" patternUnits="userSpaceOnUse">
+          <circle cx="5" cy="5" r="1.4" fill="#334155" fillOpacity={0.55} />
+        </pattern>
+        <linearGradient id="sr-uniform" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#1e3a8a" />
+          <stop offset="55%" stopColor="#2563eb" />
+          <stop offset="100%" stopColor="#1d4ed8" />
+        </linearGradient>
+        <linearGradient id="sr-pants" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#1e3a5f" />
+          <stop offset="100%" stopColor="#0f2544" />
+        </linearGradient>
+        <radialGradient id="sr-skin" cx="35%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="#d9a173" />
+          <stop offset="100%" stopColor="#9c6640" />
+        </radialGradient>
+        {[
+          ['sr-cyl-red', '#7f1d1d', '#ef4444', '#991b1b'],
+          ['sr-cyl-green', '#14532d', '#22c55e', '#166534'],
+          ['sr-cyl-teal', '#134e4a', '#2dd4bf', '#115e59'],
+        ].map(([id, a, b, c]) => (
+          <linearGradient key={id} id={id} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={a} />
+            <stop offset="38%" stopColor={b} />
+            <stop offset="100%" stopColor={c} />
+          </linearGradient>
+        ))}
         <linearGradient id="sr-screen" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#0e3a5f" />
           <stop offset="100%" stopColor="#0b1f3a" />
@@ -559,103 +584,340 @@ function WorkshopScene() {
         </linearGradient>
       </defs>
 
-      {/* Isometric platform */}
-      <polygon points="300,150 560,300 300,450 40,300" fill="#1a2b45" />
-      <polygon points="40,300 300,450 300,462 40,312" fill="#0f1c31" />
-      <polygon points="560,300 300,450 300,462 560,312" fill="#13233c" />
-      <g stroke="#2b4266" strokeWidth={0.8} opacity={0.7}>
-        {Array.from({ length: 9 }, (_, i) => {
-          const t = (i + 1) / 10;
-          return (
-            <g key={i}>
-              <line x1={300 - 260 * t} y1={150 + 150 * t} x2={560 - 260 * t} y2={300 + 150 * t} />
-              <line x1={300 + 260 * t} y1={150 + 150 * t} x2={40 + 260 * t} y2={300 + 150 * t} />
+      {/* ── Floor platform ── */}
+      <polygon points={[P(0, 700), P(800, 700)].map((p) => p.join(',')).join(' ') + ` ${P(800, 700)[0]},${P(800, 700)[1] + 16} ${P(0, 700)[0]},${P(0, 700)[1] + 16}`} fill="#1e2b40" />
+      <polygon points={[P(800, 700), P(800, 0)].map((p) => p.join(',')).join(' ') + ` ${P(800, 0)[0]},${P(800, 0)[1] + 16} ${P(800, 700)[0]},${P(800, 700)[1] + 16}`} fill="#2a3a55" />
+      <g transform={FLOOR_M}>
+        <rect width={800} height={700} fill="url(#sr-floor)" />
+        <g stroke="#9fb0c4" strokeWidth={0.8} vectorEffect="non-scaling-stroke" opacity={0.7}>
+          {Array.from({ length: 15 }, (_, i) => (
+            <line key={`a${i}`} x1={(i + 1) * 50} y1={0} x2={(i + 1) * 50} y2={700} vectorEffect="non-scaling-stroke" />
+          ))}
+          {Array.from({ length: 13 }, (_, i) => (
+            <line key={`b${i}`} x1={0} y1={(i + 1) * 50} x2={800} y2={(i + 1) * 50} vectorEffect="non-scaling-stroke" />
+          ))}
+        </g>
+        <ellipse cx={400} cy={330} rx={260} ry={220} fill="#ffffff" opacity={0.18} filter="url(#sr-blur)" />
+      </g>
+
+      {/* ── Back centre: diagnostics monitor on pedestal ── */}
+      <Block x={128} y={128} w={44} d={44} h={6} color="#334155" />
+      <rect x={650} y={176} width={10} height={92} fill="#475569" />
+      <rect x={655} y={176} width={5} height={92} fill="#334155" />
+      <g transform="translate(540 34)">
+        <rect x={-6} y={-6} width={242} height={158} rx={10} fill="#1e293b" stroke="#475569" strokeWidth={1.5} />
+        <g transform="scale(1.307)">
+          <rect x={0} y={0} width={176} height={112} rx={6} fill="url(#sr-screen)" />
+          <text x={10} y={15} fontSize={10} fontWeight={800} fill="#e2e8f0" fontFamily="var(--font-display)">Apex</text>
+          <text x={166} y={15} textAnchor="end" fontSize={6.5} fill="#67e8f9" fontFamily="ui-monospace,monospace" className="sr-blink">● LIVE</text>
+          <Gauge cx={24} cy={44} r={13} color="#22d3ee" needleClass="sr-needle-a" />
+          <Gauge cx={58} cy={44} r={13} color="#f97316" needleClass="sr-needle-b" />
+          <rect x={82} y={29} width={6} height={28} rx={3} fill="#0f172a" stroke="#475569" />
+          <rect x={83.5} y={36} width={3} height={20} rx={1.5} fill="#ef4444" className="sr-thermo" />
+          <rect x={98} y={26} width={70} height={34} rx={3} fill="#0b1f3a" stroke="#1e3a5f" />
+          <path d="M101 52 L112 46 L121 49 L131 38 L140 42 L150 32 L164 36" fill="none" stroke="#22d3ee" strokeWidth={1.6} className="sr-graph" />
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <rect key={i} x={10 + i * 10} y={72} width={6} height={26} rx={1.5} fill={i % 3 === 2 ? '#f97316' : '#22d3ee'} className="sr-bar" style={{ animationDelay: `${i * 0.22}s` }} />
+          ))}
+          <rect x={88} y={72} width={80} height={6} rx={3} fill="#1e3a5f" />
+          <rect x={88} y={72} width={80} height={6} rx={3} fill="#22d3ee" className="sr-progress" />
+          <text x={88} y={92} fontSize={6.5} fill="#94a3b8" fontFamily="ui-monospace,monospace">SYS CHECK</text>
+          <text x={168} y={92} textAnchor="end" fontSize={6.5} fill="#4ade80" fontFamily="ui-monospace,monospace">OK</text>
+        </g>
+        <rect x={0} y={0} width={230} height={50} fill="#ffffff" opacity={0.05} />
+      </g>
+
+      {/* Server / control cabinet with status LEDs */}
+      <Block
+        x={300}
+        y={40}
+        w={50}
+        d={50}
+        h={140}
+        color="#334155"
+        left={
+          <g>
+            {Array.from({ length: 9 }, (_, i) => (
+              <g key={i}>
+                <rect x={5} y={8 + i * 14} width={40} height={10} rx={1} fill="#1e293b" />
+                <circle cx={10} cy={13 + i * 14} r={1.6} fill={i % 4 === 1 ? '#f97316' : '#22c55e'} className="sr-blink" style={{ animationDelay: `${i * 0.3}s` }} />
+                <rect x={16} y={12 + i * 14} width={22} height={2} fill="#475569" />
+              </g>
+            ))}
+          </g>
+        }
+      />
+
+      {/* ── Left: pegboard wall with wall-mounted splits ── */}
+      <Block
+        x={0}
+        y={330}
+        w={14}
+        d={360}
+        h={250}
+        color="#c3ccd8"
+        shadow={false}
+        right={
+          <g>
+            <rect width={360} height={250} fill="url(#sr-peg)" />
+            <rect x={2} y={2} width={356} height={246} fill="none" stroke="#94a3b8" strokeWidth={3} />
+          </g>
+        }
+      />
+      <Hot meta={H.u1}>
+        <WallSplit x={14} y={560} z={190} d={120} h={38} body="#f6f8fb" style="premium" />
+      </Hot>
+      <Hot meta={H.u2}>
+        <WallSplit x={14} y={410} z={186} d={110} h={40} body="#e8edf3" style="standard" />
+      </Hot>
+      <Hot meta={H.u3}>
+        <WallSplit x={14} y={556} z={120} d={120} h={36} body="#1f2937" style="onyx" />
+      </Hot>
+      <Hot meta={H.u4}>
+        <WallSplit x={14} y={400} z={118} d={104} h={34} body="#f1f5f9" style="slim" />
+      </Hot>
+      <Hot meta={H.u5}>
+        <FloorTower />
+      </Hot>
+      <OutdoorUnit x={20} y={470} w={56} d={90} h={74} />
+
+      {/* ── Right: pallet racking with window-type & ducted units ── */}
+      {rackUprightsX.map((x) => (
+        <Block key={`bu${x}`} x={x} y={0} w={8} d={8} h={290} color="#1d4ed8" shadow={false} />
+      ))}
+      {deckZ.map((z) => (
+        <Block key={`bb${z}`} x={590} y={0} z={z - 10} w={210} d={6} h={10} color="#ea580c" shadow={false} />
+      ))}
+      {/* Level 0 */}
+      <Pallet x={597} y={6} w={92} d={66} />
+      <Hot meta={H.w4}>
+        <WindowUnit x={603} y={10} z={10} w={78} d={56} h={54} body="#f1f5f9" grille="v" />
+      </Hot>
+      <Pallet x={700} y={6} w={90} d={66} />
+      <WindowUnit x={706} y={10} z={10} w={78} d={56} h={56} body="#e2e8f0" grille="h" display />
+      {/* Level 1 */}
+      <Block x={590} y={0} z={100} w={210} d={80} h={3} color="#64748b" shadow={false} />
+      <Hot meta={H.r3}>
+        <Block
+          x={598}
+          y={8}
+          z={103}
+          w={88}
+          d={60}
+          h={34}
+          color="#a7b3c2"
+          shadow={false}
+          left={
+            <g>
+              <rect x={4} y={4} width={40} height={26} rx={1.5} fill="#b9c4d1" stroke="#64748b" strokeWidth={0.8} />
+              {[7, 41].map((cx) => (
+                <circle key={cx} cx={cx} cy={7} r={1} fill="#475569" />
+              ))}
+              <rect x={50} y={6} width={32} height={13} rx={1} fill="#f1f5f9" />
+              <rect x={53} y={9} width={20} height={1.6} fill="#64748b" />
+              <rect x={53} y={13} width={14} height={1.6} fill="#64748b" />
+              <rect x={50} y={23} width={10} height={5} rx={1} fill="#f97316" />
             </g>
-          );
-        })}
-      </g>
-      <ellipse cx={300} cy={315} rx={190} ry={95} fill="url(#sr-floor-glow)" className="sr-pulse" />
+          }
+          right={
+            <g>
+              <circle cx={30} cy={17} r={12.5} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.8} />
+              <circle cx={30} cy={17} r={9} fill="#1f2937" />
+            </g>
+          }
+        />
+      </Hot>
+      <Pallet x={700} y={6} z={103} w={90} d={66} />
+      <Hot meta={H.w5}>
+        <WindowUnit x={706} y={10} z={113} w={78} d={56} h={54} body="#efe7d8" grille="h" />
+      </Hot>
+      {/* Level 2 */}
+      <Block x={590} y={0} z={200} w={210} d={80} h={3} color="#64748b" shadow={false} />
+      <Hot meta={H.w6}>
+        <WindowUnit x={602} y={10} z={203} w={78} d={56} h={54} body="#f8fafc" grille="h" display />
+      </Hot>
+      <Hot meta={H.w7}>
+        <WindowUnit x={704} y={10} z={203} w={78} d={56} h={56} body="#e5e7eb" grille="mesh" />
+      </Hot>
+      {[100, 200, 290].map((z) => (
+        <Block key={`fb${z}`} x={590} y={72} z={z - 10} w={210} d={8} h={10} color="#f97316" shadow={false} />
+      ))}
+      {rackUprightsX.map((x) => (
+        <Block key={`fu${x}`} x={x} y={72} w={8} d={8} h={290} color="#2563eb" shadow={false} />
+      ))}
 
-      {/* ── Back: diagnostics wall monitor ── */}
-      <g transform="translate(214 40)">
-        <rect x={84} y={150} width={8} height={60} fill="#334155" />
-        <rect x={0} y={0} width={176} height={112} rx={8} fill="#1e293b" stroke="#475569" strokeWidth={1.5} />
-        <rect x={6} y={6} width={164} height={100} rx={5} fill="url(#sr-screen)" />
-        <text x={14} y={20} fontSize={10} fontWeight={800} fill="#e2e8f0" fontFamily="var(--font-display)">Apex</text>
-        <text x={162} y={20} textAnchor="end" fontSize={6.5} fill="#67e8f9" fontFamily="ui-monospace,monospace" className="sr-blink">● LIVE</text>
-        <Gauge cx={30} cy={48} r={13} color="#22d3ee" needleClass="sr-needle-a" />
-        <Gauge cx={64} cy={48} r={13} color="#f97316" needleClass="sr-needle-b" />
-        {/* Thermometer */}
-        <rect x={88} y={33} width={6} height={28} rx={3} fill="#0f172a" stroke="#475569" />
-        <rect x={89.5} y={40} width={3} height={20} rx={1.5} fill="#ef4444" className="sr-thermo" />
-        {/* Live line graph */}
-        <rect x={104} y={30} width={60} height={34} rx={3} fill="#0b1f3a" stroke="#1e3a5f" />
-        <path d="M107 56 L116 50 L124 53 L132 42 L140 46 L148 36 L160 40" fill="none" stroke="#22d3ee" strokeWidth={1.6} className="sr-graph" />
-        {/* Bar meters */}
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-          <rect key={i} x={14 + i * 10} y={74} width={6} height={22} rx={1.5} fill={i % 3 === 2 ? '#f97316' : '#22d3ee'} className="sr-bar" style={{ animationDelay: `${i * 0.22}s` }} />
-        ))}
-        <rect x={92} y={74} width={72} height={6} rx={3} fill="#1e3a5f" />
-        <rect x={92} y={74} width={72} height={6} rx={3} fill="#22d3ee" className="sr-progress" />
-        <text x={92} y={93} fontSize={6.5} fill="#94a3b8" fontFamily="ui-monospace,monospace">SYS CHECK</text>
-        <text x={164} y={93} textAnchor="end" fontSize={6.5} fill="#4ade80" fontFamily="ui-monospace,monospace">OK</text>
-      </g>
+      {/* ── Centre-right: packaged commercial units ── */}
+      <Hot meta={H.c2}>
+        <Block
+          x={480}
+          y={90}
+          w={120}
+          d={110}
+          h={110}
+          color="#d9dee5"
+          left={
+            <g>
+              <rect x={6} y={8} width={50} height={86} rx={2} fill="#c3ccd8" />
+              <Slats x={7} y={9} w={48} h={84} gap={3.4} color="#7c8a9e" vertical sw={0.9} />
+              {[62, 91].map((x) => (
+                <g key={x}>
+                  <rect x={x} y={8} width={25} height={86} rx={2} fill="#e5e9ef" stroke="#a3b1c2" strokeWidth={0.8} />
+                  <rect x={x + 19} y={44} width={2.6} height={11} rx={1} fill="#475569" />
+                </g>
+              ))}
+              <rect x={66} y={12} width={14} height={5} rx={1} fill="#f97316" />
+              <rect x={0} y={100} width={120} height={10} fill="#334155" />
+            </g>
+          }
+          right={<Slats x={5} y={6} w={100} h={92} gap={3.2} color="#8592a6" vertical sw={0.9} />}
+          top={
+            <g>
+              <Fan cx={34} cy={55} r={24} />
+              <Fan cx={88} cy={55} r={24} cls="sr-spin sr-spin--b" />
+            </g>
+          }
+        />
+        <Block
+          x={490}
+          y={100}
+          z={110}
+          w={100}
+          d={90}
+          h={72}
+          color="#b8c1cd"
+          shadow={false}
+          left={
+            <g>
+              <Slats x={6} y={6} w={58} h={58} gap={5} color="#8592a6" sw={1.6} />
+              <rect x={70} y={6} width={24} height={58} rx={2} fill="#c9d1db" stroke="#8592a6" strokeWidth={0.8} />
+              <circle cx={89} cy={35} r={1.6} fill="#22c55e" className="sr-blink" />
+            </g>
+          }
+          top={<Fan cx={50} cy={45} r={28} cls="sr-spin sr-spin--fast" />}
+        />
+      </Hot>
 
-      {/* Floating calendar chips */}
+      {/* Floating schedule cards */}
       {[
-        { x: 430, y: 118, d: '0s' },
-        { x: 470, y: 150, d: '0.8s' },
-        { x: 120, y: 170, d: '1.4s' },
+        { x: 880, y: 118, d: '0s' },
+        { x: 960, y: 150, d: '0.8s' },
+        { x: 1030, y: 106, d: '1.5s' },
       ].map((c, i) => (
         <g key={i} className="sr-float" style={{ animationDelay: c.d }}>
           <g transform={`translate(${c.x} ${c.y})`}>
-            <rect x={0} y={0} width={30} height={30} rx={4} fill="#f8fafc" />
-            <rect x={0} y={0} width={30} height={9} rx={4} fill="#ef4444" />
-            <rect x={0} y={5} width={30} height={4} fill="#ef4444" />
+            <rect x={2} y={3} width={34} height={34} rx={5} fill="#020617" opacity={0.25} />
+            <rect x={0} y={0} width={34} height={34} rx={5} fill="#f8fafc" />
+            <rect x={0} y={0} width={34} height={10} rx={5} fill="#ef4444" />
+            <rect x={0} y={6} width={34} height={4} fill="#ef4444" />
             {[0, 1, 2].map((r) =>
               [0, 1, 2, 3].map((k) => (
-                <rect key={`${r}-${k}`} x={4 + k * 6} y={12 + r * 5.5} width={3.6} height={3.2} rx={0.6} fill={r === 1 && k === 2 ? '#22d3ee' : '#cbd5e1'} />
+                <rect key={`${r}-${k}`} x={4.5 + k * 7} y={14 + r * 6.4} width={4.2} height={3.8} rx={0.7} fill={r === 1 && k === 2 ? '#22d3ee' : '#cbd5e1'} />
               )),
             )}
           </g>
         </g>
       ))}
 
-      {/* ── Left: outdoor condenser under diagnosis ── */}
-      <IsoBox x={170} y={300} w={66} d={56} h={64} top="#e2e8f0" left="#cbd5e1" right="#94a3b8" />
-      {/* Fan on top face */}
-      <g transform="translate(176 239)">
-        <g transform="scale(1 0.58) rotate(0)">
-          <circle r={24} fill="#0f172a" stroke="#64748b" strokeWidth={1.4} />
-          <g className="sr-spin sr-spin--fast">
-            {[0, 120, 240].map((a) => (
-              <ellipse key={a} rx={18} ry={6} cx={9} transform={`rotate(${a})`} fill="#475569" />
-            ))}
+      {/* ── Centre: holographic service console ── */}
+      <Block
+        x={330}
+        y={230}
+        w={140}
+        d={100}
+        h={70}
+        color="#eef2f6"
+        top={
+          <g>
+            <rect x={10} y={10} width={120} height={80} rx={8} fill="#0e3a5f" />
+            <rect x={10} y={10} width={120} height={80} rx={8} fill="none" stroke="#22d3ee" strokeWidth={1.4} className="sr-pulse" />
+            <g transform="translate(70 50)">
+              <circle r={34} fill="none" stroke="#22d3ee" strokeWidth={1.2} strokeDasharray="4 5" className="sr-spin sr-spin--slow" />
+              <circle r={26} fill="#22d3ee" opacity={0.12} className="sr-pulse" />
+              <g className="sr-spin">
+                {[0, 90, 180, 270].map((a) => (
+                  <path key={a} d="M0 0 C 8 -18, 26 -22, 30 -8 C 18 -10, 10 -6, 0 0 Z" transform={`rotate(${a})`} fill="#67e8f9" opacity={0.9} />
+                ))}
+              </g>
+              <circle r={5} fill="#ecfeff" />
+            </g>
           </g>
-          <circle r={4} fill="#94a3b8" />
-        </g>
-      </g>
-      {/* Side coil fins */}
-      <g stroke="#64748b" strokeWidth={1}>
-        {Array.from({ length: 8 }, (_, i) => {
-          const t = 0.1 + i * 0.1;
-          const x = 170 - 56 * ISO_X * t;
-          const y = 300 - 56 * ISO_Y * t;
-          return <line key={i} x1={x} y1={y - 8} x2={x} y2={y - 56} />;
-        })}
-      </g>
-      {/* Hot exhaust shimmer */}
-      {[0, 1, 2].map((i) => (
-        <circle key={i} cx={168 + i * 10} cy={226} r={3} fill="#fdba74" className="sr-rise-warm" style={{ animationDelay: `${i * 0.6}s` }} />
+        }
+        left={
+          <g>
+            <rect x={0} y={3} width={140} height={2} fill="#22d3ee" className="sr-pulse" />
+            <line x1={46} y1={10} x2={46} y2={70} stroke="#cbd5e1" />
+            <line x1={94} y1={10} x2={94} y2={70} stroke="#cbd5e1" />
+            <Slats x={8} y={50} w={30} h={14} gap={3.4} color="#94a3b8" />
+            <rect x={56} y={18} width={28} height={12} rx={2} fill="#0b1f3a" />
+            <text x={70} y={26.5} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#22d3ee" fontFamily="ui-monospace,monospace">SCAN</text>
+          </g>
+        }
+      />
+      <polygon points={`${P(400, 280, 70)[0] - 40},${P(400, 280, 70)[1]} ${P(400, 280, 70)[0] + 40},${P(400, 280, 70)[1]} ${P(400, 280, 70)[0] + 24},${P(400, 280, 70)[1] - 90} ${P(400, 280, 70)[0] - 24},${P(400, 280, 70)[1] - 90}`} fill="url(#sr-holo)" opacity={0.55} className="sr-pulse" />
+      {Array.from({ length: 7 }, (_, i) => (
+        <circle key={i} cx={P(400, 280, 70)[0] - 27 + i * 9} cy={P(400, 280, 70)[1] - 4} r={2.4} fill="#a5f3fc" className="sr-rise" style={{ animationDelay: `${i * 0.42}s` }} />
       ))}
-      {/* Gauge hoses to service ports */}
-      <path d="M214 290 C 226 300, 236 284, 246 262" fill="none" stroke="#3b82f6" strokeWidth={2.2} />
-      <path d="M216 296 C 232 312, 244 290, 250 266" fill="none" stroke="#ef4444" strokeWidth={2.2} />
 
-      {/* Technician A: manifold gauges at condenser */}
+      {/* ── Centre-left: large VRF outdoor condenser ── */}
+      <Hot meta={H.c1}>
+        <Block
+          x={190}
+          y={300}
+          w={110}
+          d={120}
+          h={150}
+          color="#eceff3"
+          top={
+            <g>
+              <rect x={6} y={6} width={98} height={108} rx={4} fill="#d5dbe3" />
+              <Fan cx={55} cy={60} r={44} cls="sr-spin sr-spin--fast" />
+            </g>
+          }
+          left={
+            <g>
+              <rect x={8} y={14} width={94} height={108} rx={2} fill="#dde3ea" />
+              <Slats x={10} y={16} w={90} h={104} gap={5.2} color="#9aa8b9" sw={1.6} />
+              <rect x={8} y={130} width={30} height={12} rx={1.5} fill="#0b1f3a" />
+              <text x={23} y={138.6} textAnchor="middle" fontSize={7} fontWeight={800} fill="#22d3ee" fontFamily="ui-monospace,monospace">VRF</text>
+              <text x={98} y={140} textAnchor="end" fontSize={6.5} fontWeight={800} letterSpacing={1.2} fill="#94a3b8">APEX</text>
+            </g>
+          }
+          right={
+            <g>
+              <Slats x={6} y={10} w={108} h={112} gap={3.4} color="#8592a6" vertical sw={0.9} />
+              <rect x={86} y={128} width={30} height={16} rx={2} fill="#cbd5e1" />
+              <circle cx={94} cy={136} r={3.2} fill="#c08a2b" />
+              <circle cx={106} cy={136} r={3.2} fill="#c08a2b" />
+            </g>
+          }
+        />
+      </Hot>
+      {/* Hot exhaust shimmer above the condenser */}
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={P(245, 360, 150)[0] - 12 + i * 12} cy={P(245, 360, 150)[1] - 8} r={3.2} fill="#fdba74" className="sr-rise-warm" style={{ animationDelay: `${i * 0.6}s` }} />
+      ))}
+
+      {/* Technician C: tablet inspection next to the packaged units */}
       <Technician
-        x={262}
-        y={330}
+        x={968}
+        y={462}
+        flip
+        armLeft={-50}
+        armRight={-80}
+        armRightClass="sr-arm-tablet"
+        headClass="sr-head-scan"
+        prop={
+          <g transform="translate(-2 22) rotate(70)">
+            <rect x={-9} y={-12} width={18} height={24} rx={2.5} fill="#0f172a" />
+            <rect x={-7} y={-10} width={14} height={20} rx={1.5} fill="#22d3ee" className="sr-screen-flicker" />
+          </g>
+        }
+      />
+
+      {/* Technician A: manifold gauges at the condenser */}
+      <Technician
+        x={612}
+        y={414}
         flip
         armLeft={20}
         armRight={0}
@@ -680,97 +942,103 @@ function WorkshopScene() {
         }
       />
 
-      {/* Refrigerant cylinders */}
-      <g transform="translate(118 340)">
-        <rect x={0} y={-34} width={16} height={34} rx={7} fill="#16a34a" />
-        <rect x={5} y={-40} width={6} height={7} rx={1} fill="#334155" />
-        <rect x={22} y={-42} width={18} height={42} rx={8} fill="#dc2626" />
-        <rect x={28} y={-48} width={6} height={7} rx={1} fill="#334155" />
-        <ellipse cx={20} cy={1} rx={24} ry={5} fill="#020617" opacity={0.35} />
-      </g>
-
-      {/* ── Centre: holographic service console ── */}
-      <IsoBox x={300} y={392} w={70} d={70} h={34} top="#e2e8f0" left="#94a3b8" right="#cbd5e1" />
-      {/* Holo projection beam */}
-      <polygon points="262,322 338,322 322,250 278,250" fill="url(#sr-holo)" opacity={0.5} className="sr-pulse" />
-      <g transform="translate(300 322)">
-        <ellipse rx={48} ry={26} fill="#22d3ee" opacity={0.16} className="sr-pulse" />
-        <g transform="scale(1 0.55)">
-          <circle r={38} fill="none" stroke="#22d3ee" strokeWidth={1.5} strokeDasharray="4 5" className="sr-spin sr-spin--slow" />
-          <g className="sr-spin">
-            {[0, 90, 180, 270].map((a) => (
-              <path key={a} d="M0 0 C 8 -18, 26 -22, 30 -8 C 18 -10, 10 -6, 0 0 Z" transform={`rotate(${a})`} fill="#67e8f9" opacity={0.85} />
-            ))}
-          </g>
-          <circle r={6} fill="#ecfeff" />
-        </g>
-      </g>
-      {/* Cool air particles rising */}
-      {Array.from({ length: 7 }, (_, i) => (
-        <circle
-          key={i}
-          cx={272 + i * 9}
-          cy={318}
-          r={2.4}
-          fill="#a5f3fc"
-          className="sr-rise"
-          style={{ animationDelay: `${i * 0.42}s` }}
-        />
-      ))}
-
-      {/* Technician B: running system scan on the console */}
+      {/* Technician B: running a system scan on the console */}
       <Technician
-        x={250}
-        y={402}
+        x={676}
+        y={432}
         armLeft={-60}
         armRight={-70}
         armLeftClass="sr-arm-type-a"
         armRightClass="sr-arm-type-b"
         headClass="sr-head-nod"
-        shirt="#1e40af"
       />
 
-      {/* ── Right: equipment rack + tablet technician ── */}
-      <IsoBox x={444} y={298} w={30} d={44} h={88} top="#94a3b8" left="#64748b" right="#475569" />
-      {[0, 1, 2, 3].map((i) => (
-        <g key={i}>
-          <polygon
-            points={pts([
-              [444, 298 - 16 - i * 20],
-              [444 + 30 * ISO_X, 298 - 16 - i * 20 - 30 * ISO_Y],
-              [444 + 30 * ISO_X, 298 - 30 - i * 20 - 30 * ISO_Y],
-              [444, 298 - 30 - i * 20],
-            ])}
-            fill="#334155"
-          />
-          <circle cx={450} cy={298 - 25 - i * 20} r={1.6} fill={i === 1 ? '#f97316' : '#22c55e'} className="sr-blink" style={{ animationDelay: `${i * 0.5}s` }} />
-        </g>
-      ))}
-      {/* Tool chest */}
-      <IsoBox x={392} y={392} w={40} d={26} h={36} top="#ef4444" left="#b91c1c" right="#dc2626" />
-      {[0, 1, 2].map((i) => (
-        <line key={i} x1={394} y1={386 - i * 10} x2={426} y2={368 - i * 10} stroke="#7f1d1d" strokeWidth={1.4} />
-      ))}
-
-      {/* Technician C: tablet inspection */}
-      <Technician
-        x={404}
-        y={338}
-        flip
-        armLeft={-50}
-        armRight={-80}
-        armRightClass="sr-arm-tablet"
-        headClass="sr-head-scan"
-        shirt="#2563eb"
-        prop={
-          <g transform="translate(-2 22) rotate(70)">
-            <rect x={-9} y={-12} width={18} height={24} rx={2.5} fill="#0f172a" />
-            <rect x={-7} y={-10} width={14} height={20} rx={1.5} fill="#22d3ee" className="sr-screen-flicker" />
+      {/* Red tool chest */}
+      <Block
+        x={200}
+        y={470}
+        w={50}
+        d={46}
+        h={92}
+        color="#dc2626"
+        top={<rect x={3} y={3} width={44} height={40} rx={2} fill="#1f2937" />}
+        left={
+          <g>
+            {Array.from({ length: 5 }, (_, i) => (
+              <g key={i}>
+                <rect x={3} y={6 + i * 16} width={44} height={13} rx={1} fill="#ef4444" stroke="#991b1b" strokeWidth={0.8} />
+                <rect x={15} y={10 + i * 16} width={20} height={2.6} rx={1.3} fill="#e5e7eb" />
+              </g>
+            ))}
           </g>
         }
       />
 
-      {/* Technician D: walks across the front carrying a new filter */}
+      {/* Floor pallet A: stacked window units */}
+      <Pallet x={650} y={130} w={90} d={80} />
+      <Hot meta={H.w2}>
+        <WindowUnit x={655} y={138} z={10} w={80} d={64} h={58} body="#f4f6f9" grille="h" />
+      </Hot>
+      <Hot meta={H.w1}>
+        <WindowUnit x={658} y={140} z={68} w={76} d={60} h={56} body="#fbfcfd" grille="v" display />
+      </Hot>
+
+      {/* Refrigerant cylinders */}
+      <Cylinder x={468} y={448} h={56} r={11} grad="sr-cyl-red" />
+      <Cylinder x={494} y={456} h={46} r={10} grad="sr-cyl-green" />
+      <Cylinder x={515} y={444} h={40} r={9} grad="sr-cyl-teal" />
+
+      {/* Cardboard boxes (new stock) */}
+      <OutdoorUnit x={20} y={590} w={60} d={100} h={80} />
+      <Block
+        x={120}
+        y={560}
+        w={110}
+        d={130}
+        h={90}
+        color="#c8955c"
+        top={<rect x={0} y={58} width={110} height={14} fill="#e0b47f" opacity={0.85} />}
+        left={
+          <g>
+            <rect x={0} y={0} width={110} height={10} fill="#e0b47f" opacity={0.8} />
+            <text x={10} y={36} fontSize={13} fontWeight={800} fill="#7c4f22" letterSpacing={2}>APEX</text>
+            <text x={10} y={50} fontSize={6.5} fontWeight={700} fill="#7c4f22">SPLIT-TYPE INVERTER</text>
+            <path d="M80 30 v-12 m-5 5 l5 -5 l5 5 M94 30 v-12 m-5 5 l5 -5 l5 5" stroke="#7c4f22" strokeWidth={1.6} fill="none" />
+            <rect x={10} y={60} width={34} height={16} fill="none" stroke="#7c4f22" strokeWidth={1} />
+          </g>
+        }
+        right={<text x={14} y={40} fontSize={10} fontWeight={800} fill="#6b4420">1.5 HP</text>}
+      />
+      <Block
+        x={138}
+        y={585}
+        z={90}
+        w={76}
+        d={86}
+        h={56}
+        color="#d1a16a"
+        shadow={false}
+        top={<rect x={0} y={36} width={76} height={12} fill="#e8c08f" opacity={0.85} />}
+        left={<text x={8} y={30} fontSize={9} fontWeight={800} fill="#7c4f22" letterSpacing={1.5}>APEX</text>}
+      />
+      <Block
+        x={248}
+        y={600}
+        w={84}
+        d={90}
+        h={64}
+        color="#c08a52"
+        top={<rect x={36} y={0} width={12} height={90} fill="#dcae78" opacity={0.85} />}
+        left={<text x={8} y={30} fontSize={8} fontWeight={800} fill="#6b4420">WINDOW TYPE</text>}
+      />
+
+      {/* Floor pallet B */}
+      <Pallet x={700} y={250} w={90} d={80} />
+      <Hot meta={H.w3}>
+        <WindowUnit x={705} y={258} z={10} w={80} d={64} h={58} body="#e7ebf0" grille="mesh" display />
+      </Hot>
+
+      {/* Technician D: walks across the front carrying a replacement filter */}
       <g className="sr-walk-path">
         <g className="sr-walk-flip">
           <Technician
@@ -780,18 +1048,59 @@ function WorkshopScene() {
             armRight={-40}
             bodyClass="sr-walk-bob"
             legClass={['sr-leg-a', 'sr-leg-b']}
-            shirt="#0e7490"
             prop={
               <g transform="translate(10 20) rotate(40)">
                 <rect x={-14} y={-10} width={28} height={20} rx={2} fill="#e2e8f0" stroke="#64748b" />
-                {[0, 1, 2, 3].map((k) => (
-                  <line key={k} x1={-11 + k * 7} y1={-8} x2={-11 + k * 7} y2={8} stroke="#94a3b8" />
-                ))}
+                <Slats x={-12} y={-8} w={24} h={16} gap={5} color="#94a3b8" vertical sw={0.8} />
               </g>
             }
           />
         </g>
       </g>
+
+      {/* Split indoor units (boxed stock) lying in front */}
+      <Block
+        x={340}
+        y={620}
+        w={130}
+        d={56}
+        h={32}
+        color="#f4f6f9"
+        left={
+          <g>
+            <rect x={6} y={20} width={118} height={6} rx={3} fill="#1f2937" />
+            <path d="M8 6 Q65 2 122 6" stroke="#ffffff" strokeWidth={1.2} fill="none" />
+            <text x={8} y={15} fontSize={4.6} fontWeight={800} fill="#94a3b8" letterSpacing={1}>APEX INVERTER</text>
+          </g>
+        }
+      />
+
+      {/* Front-right: 4-way ceiling cassette on a pallet */}
+      <Pallet x={520} y={520} w={82} d={82} />
+      <Hot meta={H.r4}>
+        <Block
+          x={524}
+          y={524}
+          z={10}
+          w={74}
+          d={74}
+          h={24}
+          color="#eef2f6"
+          shadow={false}
+          top={
+            <g>
+              <rect x={3} y={3} width={68} height={68} rx={4} fill="#f8fafc" stroke="#cbd5e1" />
+              <rect x={10} y={7} width={54} height={7} rx={2} fill="#1f2937" />
+              <rect x={10} y={60} width={54} height={7} rx={2} fill="#1f2937" />
+              <rect x={7} y={18} width={7} height={38} rx={2} fill="#1f2937" />
+              <rect x={60} y={18} width={7} height={38} rx={2} fill="#1f2937" />
+              <rect x={20} y={20} width={34} height={34} rx={2} fill="#e5e7eb" />
+              <Slats x={21} y={21} w={32} h={32} gap={3.6} color="#a3b1c2" vertical sw={0.9} />
+              <circle cx={56} cy={58} r={1.4} fill="#22d3ee" className="sr-blink" />
+            </g>
+          }
+        />
+      </Hot>
     </svg>
   );
 }
@@ -803,85 +1112,115 @@ function WorkshopScene() {
 export function ProductShowroomHero() {
   const language = useHVACStore((s) => s.language);
   const setQuoteModalOpen = useHVACStore((s) => s.setQuoteModalOpen);
+  const enterExperience = useHVACStore((s) => s.enterExperience);
   const en = language === 'en';
 
-  const byId = (id: string) => EQUIPMENT_CATALOG.find((e) => e.id === id)!;
-  const left = LEFT_IDS.map(byId);
-  const right = RIGHT_IDS.map(byId);
+  const [active, setActive] = useState<HotMeta | null>(null);
+  const timer = useRef<number | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const cancelClose = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+  const open = useCallback(
+    (m: HotMeta) => {
+      cancelClose();
+      setActive(m);
+    },
+    [cancelClose],
+  );
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    timer.current = window.setTimeout(() => setActive(null), 220);
+  }, [cancelClose]);
+
+  // Tap/click outside closes; Escape closes.
+  useEffect(() => {
+    if (!active) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as Element | null;
+      if (el && !el.closest('.sr-item') && !el.closest('.sr-pop')) setActive(null);
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') setActive(null);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [active]);
+
+  useEffect(() => () => cancelClose(), [cancelClose]);
 
   return (
     <section aria-labelledby="showroom-heading" className="sr-section relative w-full">
       <div aria-hidden="true" className="bp-band-grid" />
-      <div aria-hidden="true" className="sr-section-glow" />
 
-      <div className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 pt-6 sm:pt-8 pb-10">
+      <div className="relative z-10 mx-auto max-w-[1440px] px-3 sm:px-6 pt-6 sm:pt-8 pb-6">
         <header className="text-center max-w-4xl mx-auto">
-          <p className="text-xs sm:text-sm font-semibold tracking-wide text-[#67e8f9]">
-            {siteConfig.brand.name} <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
+          <p className="text-sm sm:text-base font-semibold tracking-wide text-[#67e8f9]/90">
+            {siteConfig.brand.name} <span aria-hidden="true">•</span> {siteConfig.brand.locationLabel}
           </p>
           <h1
             id="showroom-heading"
             className="mt-2 font-display font-extrabold tracking-tight text-white text-balance leading-[1.08]"
-            style={{ fontSize: 'clamp(1.75rem, 3.6vw, 3.1rem)' }}
+            style={{ fontSize: 'clamp(1.8rem, 3.8vw, 3.25rem)' }}
           >
             {en
               ? 'Professional HVAC Services & High-Quality Aircon Products'
               : 'Propesyonal na HVAC Services at De-kalidad na Aircon'}
           </h1>
-          <p className="mt-3 text-sm sm:text-[15px] text-slate-300 max-w-3xl mx-auto leading-relaxed">
+          <p className="mt-3 text-sm sm:text-base md:text-lg text-slate-100 max-w-4xl mx-auto leading-snug">
             {en
-              ? 'From split-type, window and floor-mounted units to cassettes, ducted and VRF systems, our certified local technicians handle installation, cleaning and emergency repairs. Hover any unit to compare.'
-              : 'Mula split-type, window at floor-mounted hanggang cassette, ducted at VRF, kami ang bahala sa installation, cleaning at emergency repair. I-hover ang unit para makita ang detalye.'}
+              ? 'From top-tier split-type, window, and commercial AC units to expert installation and emergency repairs, we have your comfort covered. Get high-efficiency systems backed by certified local technicians. Explore our products and book today.'
+              : 'Mula split-type, window, at commercial AC hanggang expert installation at emergency repair, sagot namin ang ginhawa mo. High-efficiency systems na may certified local technicians. Silipin ang mga produkto at mag-book ngayon.'}
           </p>
         </header>
 
-        <div className="sr-stage mt-6 sm:mt-8">
-          <div className="sr-col">
-            <p className="sr-col-label">{en ? 'Residential' : 'Pambahay'}</p>
-            <div className="sr-grid">
-              {left.map((item) => (
-                <ProductCard key={item.id} item={item} align="left" />
-              ))}
+        <HotContext.Provider value={{ active, open, scheduleClose, cancelClose }}>
+          <div ref={wrapRef} className="sr-scene-wrap relative mt-2 sm:mt-0">
+            <ShowroomScene />
+            {active && <ProductPopover meta={active} onClose={() => setActive(null)} />}
+
+            <div className="sr-cta">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-5">
+                <button
+                  type="button"
+                  onClick={() => enterExperience('residential', { service: 'equipment' })}
+                  className="pointer-events-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl border border-[#22D3EE]/40 bg-[#0B1F3A]/92 text-white font-display font-bold text-sm sm:text-lg min-h-[52px] shadow-[0_12px_30px_rgba(2,6,23,0.6)] backdrop-blur hover:border-[#67e8f9] hover:bg-[#0e2a4d] transition-colors"
+                >
+                  <Settings2 className="w-5 h-5 text-[#67e8f9]" aria-hidden="true" />
+                  {en ? 'Browse Aircon Products' : 'Tingnan ang mga Aircon'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuoteModalOpen(true)}
+                  className="pointer-events-auto cta-glow-amber cta-shimmer inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl bg-gradient-to-b from-[#f5b544] to-[#e09a1f] border border-[#fcd34d]/80 text-white font-display font-bold text-sm sm:text-lg min-h-[52px] cursor-pointer"
+                >
+                  <CalendarCheck className="w-5 h-5" aria-hidden="true" />
+                  {en ? 'Book a Service Appointment' : 'Mag-book ng Serbisyo'}
+                </button>
+              </div>
             </div>
           </div>
+        </HotContext.Provider>
 
-          <div className="sr-center">
-            <WorkshopScene />
-          </div>
-
-          <div className="sr-col">
-            <p className="sr-col-label sr-col-label--amber">{en ? 'Commercial' : 'Pang-negosyo'}</p>
-            <div className="sr-grid">
-              {right.map((item) => (
-                <ProductCard key={item.id} item={item} align="right" />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center gap-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-            <a
-              href="#services"
-              className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl border border-[#22D3EE]/45 bg-[#0B1F3A]/80 text-white font-display font-bold text-sm sm:text-base min-h-[48px] hover:border-[#67e8f9] hover:bg-[#0e2a4d] transition-colors"
-            >
-              <Settings2 className="w-4 h-4" aria-hidden="true" />
-              {en ? 'Browse Aircon Services' : 'Tingnan ang mga Serbisyo'}
-            </a>
-            <button
-              type="button"
-              onClick={() => setQuoteModalOpen(true)}
-              className="cta-glow-amber cta-shimmer inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#c2410c] via-[#ea580c] to-[#F97316] border border-[#fdba74]/80 text-white font-display font-bold text-sm sm:text-base min-h-[48px] cursor-pointer"
-            >
-              <CalendarCheck className="w-4 h-4" aria-hidden="true" />
-              {en ? 'Book a Service Appointment' : 'Mag-book ng Serbisyo'}
-            </button>
-          </div>
+        <div className="mt-3 flex flex-col items-center gap-1.5 text-center">
+          <p className="text-sm sm:text-base text-slate-100">
+            {en
+              ? 'Explore products & service areas • Scroll down for full details'
+              : 'Silipin ang mga produkto at lugar • Mag-scroll pababa para sa detalye'}
+          </p>
           <a
             href="#explore-3d"
-            className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-[#67e8f9] hover:text-white transition-colors"
+            className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm sm:text-base font-semibold text-[#67e8f9] hover:text-white transition-colors"
           >
-            {en ? 'Explore a home or commercial building in 3D' : 'Silipin ang bahay o commercial building sa 3D'}
+            {en ? 'See our product range & service coverage' : 'Tingnan ang aming mga produkto at serbisyo'}
             <ChevronDown className="w-4 h-4 animate-bounce" aria-hidden="true" />
           </a>
         </div>
