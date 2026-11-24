@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 import {
   createCopperPatinaMaps,
   createLinesetWrapMaps,
@@ -328,11 +329,11 @@ export function PipingAndDuctRoute() {
         <Html
           position={audience === 'residential' ? [2.85, 1.35, -1.55] : [2.85, 3.85, -1.25]}
           center
-          distanceFactor={7.5}
+          distanceFactor={4.4}
         >
           <div className="px-2.5 py-1.5 rounded-lg bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[11px] text-slate-100 whitespace-nowrap pointer-events-none shadow-lg">
             <div className="font-semibold text-[#22D3EE]">
-              {installStep === 5 ? 'Leak & Vacuum Verified' : 'Commissioning Readings'}
+              {installStep === 5 ? tr('Leak & Vacuum Verified') : tr('Commissioning Readings')}
             </div>
             <div className="font-mono-tabular text-[10px] text-slate-300 mt-0.5">
               {installStep === 5

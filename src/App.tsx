@@ -29,6 +29,7 @@ import { HomeMarketingSections } from './components/ui/HomeMarketingSections';
 import { MobileSheet } from './components/ui/MobileSheet';
 import { Non3DFallback } from './components/ui/Non3DFallback';
 import { ProductShowroomHero } from './components/ui/ProductShowroomHero';
+import { htmlLang, tr } from './i18n/tr';
 import { QuoteModal } from './components/ui/QuoteModal';
 import { TopBar } from './components/ui/TopBar';
 import { parseRouteFromLocation, useHVACStore } from './store/useHVACStore';
@@ -82,12 +83,13 @@ function OnboardingHint() {
   return (
     <div
       aria-live="polite"
-      lang={language === 'en' ? 'en' : 'tl'}
+      lang={htmlLang(language)}
       className="pointer-events-none fixed top-[70px] left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full bg-[#0B1F3A]/90 border border-[#22D3EE]/40 text-[11px] sm:text-xs font-medium text-slate-100 shadow-lg whitespace-nowrap"
     >
-      {language === 'en'
-        ? 'Drag to rotate · Pinch or scroll to zoom · Tap + markers to inspect'
-        : 'I-drag para umikot · Pinch/scroll para mag-zoom · Pindutin ang + markers'}
+      {tr(
+        'Drag to rotate · Pinch or scroll to zoom · Tap + markers to inspect',
+        'I-drag para umikot · Pinch/scroll para mag-zoom · Pindutin ang + markers',
+      )}
     </div>
   );
 }
@@ -157,7 +159,7 @@ export default function App() {
   const applyPopStateRoute = useHVACStore((s) => s.applyPopStateRoute);
 
   useEffect(() => {
-    document.documentElement.lang = language === 'en' ? 'en' : 'tl';
+    document.documentElement.lang = htmlLang(language);
   }, [language]);
 
   useEffect(() => {

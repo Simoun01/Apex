@@ -25,7 +25,7 @@ function Featured({ kind, brandId, explodeRef, exploded, en }: { kind: UnitKind;
     const k = 1 - Math.pow(1 - t.current, 3);
     const g = group.current;
     if (!g) return;
-    const target = base * (exploded ? 0.62 : 1);
+    const target = base * (exploded ? 0.5 : 1);
     g.scale.setScalar(THREE.MathUtils.lerp(g.scale.x, target, Math.min(1, dt * 5)));
     g.position.y = (1 - k) * -0.18;
     g.rotation.y = (1 - k) * -0.6;
@@ -33,7 +33,7 @@ function Featured({ kind, brandId, explodeRef, exploded, en }: { kind: UnitKind;
 
   return (
     <group ref={group} scale={base * 0.8}>
-      <ExplodeProvider explodeRef={explodeRef} labels en={en}>
+      <ExplodeProvider explodeRef={explodeRef} labels en={en} spread={1.9}>
         <Model brand={brand} motionRef={motion} />
       </ExplodeProvider>
     </group>

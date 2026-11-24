@@ -19,6 +19,7 @@ import {
   SYMPTOM_ITEMS,
 } from '../../data/hvacData';
 import { computeRecommendedCapacity, useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 
 export function ServiceContextPanel() {
   const audience = useHVACStore((s) => s.audience);
@@ -89,10 +90,10 @@ export function ServiceContextPanel() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="text-[11px] font-medium text-[#22D3EE]">
-                {isEn ? 'Selected Component' : 'Napiling Piyesa'}
+                {tr('Selected Component', 'Napiling Piyesa')}
               </div>
               <h3 className="font-display text-sm font-bold text-white">
-                {isEn ? partInfo.nameEn : partInfo.nameTaglish}
+                {tr(partInfo.nameEn, partInfo.nameTaglish)}
               </h3>
             </div>
             <button
@@ -105,14 +106,14 @@ export function ServiceContextPanel() {
             </button>
           </div>
           <p className="text-xs text-slate-200 leading-relaxed">
-            {isEn ? partInfo.whatItDoesEn : partInfo.whatItDoesTaglish}
+            {tr(partInfo.whatItDoesEn, partInfo.whatItDoesTaglish)}
           </p>
           <div className="pt-1.5 border-t border-white/10">
             <div className="text-[11px] font-semibold text-[#F97316] mb-0.5">
-              {isEn ? 'Common Issues in Pampanga Climate' : 'Madalas na Problema sa Init at Alinsangan'}
+              {tr('Common Issues in Pampanga Climate', 'Madalas na Problema sa Init at Alinsangan')}
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              {isEn ? partInfo.tropicalIssuesEn : partInfo.tropicalIssuesTaglish}
+              {tr(partInfo.tropicalIssuesEn, partInfo.tropicalIssuesTaglish)}
             </p>
           </div>
         </div>
@@ -123,19 +124,17 @@ export function ServiceContextPanel() {
         <div className="space-y-3.5">
           <div>
             <h2 className="font-display text-base font-bold text-white">
-              {isEn ? '01. Service & Repair' : '01. Serbisyo at Repair'}
+              {tr('01. Service & Repair', '01. Serbisyo at Repair')}
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              {isEn
-                ? 'Tap a symptom below to locate likely fault parts in 3D.'
-                : 'Pindutin ang sintomas para makita sa 3D ang posibleng may sira.'}
+              {tr('Tap a symptom below to locate likely fault parts in 3D.', 'Pindutin ang sintomas para makita sa 3D ang posibleng may sira.')}
             </p>
           </div>
 
           <div className="space-y-1.5">
             <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-[#F97316]" />
-              <span>{isEn ? 'Symptom Finder' : 'Hanapin ang Sintomas'}</span>
+              <span>{tr('Symptom Finder', 'Hanapin ang Sintomas')}</span>
             </div>
             <div className="grid grid-cols-1 gap-1.5">
               {SYMPTOM_ITEMS.map((sym) => {
@@ -151,7 +150,7 @@ export function ServiceContextPanel() {
                         : 'bg-slate-900/75 border-white/10 text-slate-200 hover:border-[#22D3EE]/50'
                     }`}
                   >
-                    {isEn ? sym.labelEn : sym.labelTaglish}
+                    {tr(sym.labelEn, sym.labelTaglish)}
                   </button>
                 );
               })}
@@ -161,16 +160,16 @@ export function ServiceContextPanel() {
           {activeSymptomObj && (
             <div className="p-3 rounded-xl bg-slate-900/90 border border-[#F97316]/45 space-y-2">
               <div className="text-xs font-semibold text-[#F97316]">
-                {isEn ? 'Likely Causes' : 'Mga Posibleng Dahilan'}
+                {tr('Likely Causes', 'Mga Posibleng Dahilan')}
               </div>
               <ul className="space-y-1 text-xs text-slate-200 list-disc pl-4">
-                {(isEn ? activeSymptomObj.causesEn : activeSymptomObj.causesTaglish).map((c, i) => (
+                {(tr(activeSymptomObj.causesEn, activeSymptomObj.causesTaglish)).map((c, i) => (
                   <li key={i}>{c}</li>
                 ))}
               </ul>
               <div className="pt-1.5 border-t border-white/10 text-xs text-[#22D3EE]">
-                <strong>{isEn ? 'Recommended:' : 'Rekomendasyon:'}</strong>{' '}
-                {isEn ? activeSymptomObj.actionEn : activeSymptomObj.actionTaglish}
+                <strong>{tr('Recommended:', 'Rekomendasyon:')}</strong>{' '}
+                {tr(activeSymptomObj.actionEn, activeSymptomObj.actionTaglish)}
               </div>
             </div>
           )}
@@ -178,12 +177,10 @@ export function ServiceContextPanel() {
           <div className="p-3 rounded-xl bg-slate-900/70 border border-white/10 space-y-1.5 text-xs text-slate-300">
             <div className="font-semibold text-white flex items-center gap-1.5">
               <Wrench className="w-3.5 h-3.5 text-[#22D3EE]" />
-              <span>{isEn ? 'Included Diagnostics' : 'Kasama sa Check-up'}</span>
+              <span>{tr('Included Diagnostics', 'Kasama sa Check-up')}</span>
             </div>
             <p>
-              {isEn
-                ? 'Refrigerant pressure & superheat/subcooling check, supply-return ΔT test, capacitor & ampere draw reading, and preventive maintenance plans.'
-                : 'Pressure at freon check, lamig temperature drop test, capacitor at ampere reading, at preventive maintenance.'}
+              {tr('Refrigerant pressure & superheat/subcooling check, supply-return ΔT test, capacitor & ampere draw reading, and preventive maintenance plans.', 'Pressure at freon check, lamig temperature drop test, capacitor at ampere reading, at preventive maintenance.')}
             </p>
           </div>
         </div>
@@ -194,12 +191,10 @@ export function ServiceContextPanel() {
         <div className="space-y-3.5">
           <div>
             <h2 className="font-display text-base font-bold text-white">
-              {isEn ? '02. Deep AC Cleaning' : '02. Deep AC Cleaning'}
+              {tr('02. Deep AC Cleaning', '02. Deep AC Cleaning')}
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              {isEn
-                ? 'Drag the slider to compare clogged vs. clean coils, filter, and blower.'
-                : 'I-drag ang slider para makita ang marumi vs. malinis na coil, filter, at blower.'}
+              {tr('Drag the slider to compare clogged vs. clean coils, filter, and blower.', 'I-drag ang slider para makita ang marumi vs. malinis na coil, filter, at blower.')}
             </p>
           </div>
 
@@ -207,10 +202,10 @@ export function ServiceContextPanel() {
           <div className="p-3 rounded-xl bg-slate-900/90 border border-white/12 space-y-2.5">
             <div className="flex items-center justify-between text-xs font-medium">
               <span className="text-[#F97316]">
-                {isEn ? 'Dirty / Dusty' : 'Marumi / Barado'}
+                {tr('Dirty / Dusty', 'Marumi / Barado')}
               </span>
               <span className="font-mono-tabular text-[#22D3EE]">
-                {Math.round(cleaningBeforeAfter * 100)}% {isEn ? 'Clean' : 'Linis'}
+                {Math.round(cleaningBeforeAfter * 100)}% {tr('Clean', 'Linis')}
               </span>
             </div>
             <input
@@ -227,7 +222,7 @@ export function ServiceContextPanel() {
             {/* Dirty vs Clean Airflow Toggle */}
             <div className="pt-2 border-t border-white/10 space-y-1.5">
               <div className="text-[11px] text-slate-300">
-                {isEn ? '3D Airflow Simulation' : '3D Airflow Simulation'}
+                {tr('3D Airflow Simulation', '3D Airflow Simulation')}
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
@@ -239,7 +234,7 @@ export function ServiceContextPanel() {
                       : 'bg-slate-800/80 border-white/10 text-slate-300'
                   }`}
                 >
-                  {isEn ? 'Weak / Dirty' : 'Mahina / Barado'}
+                  {tr('Weak / Dirty', 'Mahina / Barado')}
                 </button>
                 <button
                   type="button"
@@ -250,7 +245,7 @@ export function ServiceContextPanel() {
                       : 'bg-slate-800/80 border-white/10 text-slate-300'
                   }`}
                 >
-                  {isEn ? 'Strong / Clean' : 'Malakas / Malinis'}
+                  {tr('Strong / Clean', 'Malakas / Malinis')}
                 </button>
               </div>
             </div>
@@ -259,19 +254,15 @@ export function ServiceContextPanel() {
           <div className="p-3 rounded-xl bg-slate-900/70 border border-white/10 space-y-2 text-xs text-slate-300">
             <div className="font-semibold text-white flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-[#22D3EE]" />
-              <span>{isEn ? 'Cleaning Frequency Guide' : 'Gaano Kadalas Magpalinis?'}</span>
+              <span>{tr('Cleaning Frequency Guide', 'Gaano Kadalas Magpalinis?')}</span>
             </div>
             <p>
-              {isEn
-                ? 'Residential: every 3–6 months. Commercial or dusty roadside locations in Pampanga: every 1–3 months to protect indoor air quality and keep inverter kWh low.'
-                : 'Bahay: tuwing 3–6 months. Commercial o malapit sa maalikabok na kalsada: tuwing 1–3 months para malinis ang hangin at tipid sa kuryente.'}
+              {tr('Residential: every 3–6 months. Commercial or dusty roadside locations in Pampanga: every 1–3 months to protect indoor air quality and keep inverter kWh low.', 'Bahay: tuwing 3–6 months. Commercial o malapit sa maalikabok na kalsada: tuwing 1–3 months para malinis ang hangin at tipid sa kuryente.')}
             </p>
             <div className="flex items-center gap-1.5 text-[11px] text-[#22D3EE]">
               <Droplets className="w-3.5 h-3.5 shrink-0" />
               <span>
-                {isEn
-                  ? 'Includes coil wash, blower wheel, drain line flush & outdoor condenser.'
-                  : 'Kasama ang evaporator, blower wheel, drain flush, at outdoor condenser.'}
+                {tr('Includes coil wash, blower wheel, drain line flush & outdoor condenser.', 'Kasama ang evaporator, blower wheel, drain flush, at outdoor condenser.')}
               </span>
             </div>
           </div>
@@ -284,12 +275,10 @@ export function ServiceContextPanel() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="font-display text-base font-bold text-white">
-                {isEn ? '03. Equipment Sale' : '03. Benta ng Aircon Units'}
+                {tr('03. Equipment Sale', '03. Benta ng Aircon Units')}
               </h2>
               <p className="text-xs text-slate-300 mt-0.5">
-                {isEn
-                  ? 'Select a unit to inspect in 3D or compare models.'
-                  : 'Pumili ng unit para makita sa 3D o i-compare.'}
+                {tr('Select a unit to inspect in 3D or compare models.', 'Pumili ng unit para makita sa 3D o i-compare.')}
               </p>
             </div>
             <button
@@ -330,7 +319,7 @@ export function ServiceContextPanel() {
                       className="text-left flex-1 min-w-0"
                     >
                       <div className="text-xs font-semibold text-white truncate">
-                        {isEn ? item.nameEn : item.nameTaglish}
+                        {tr(item.nameEn, item.nameTaglish)}
                       </div>
                       <div className="text-[11px] text-slate-300 font-mono-tabular mt-0.5">
                         {item.capacityRange} · {item.inverter ? 'Inverter' : 'Fixed-Speed'}
@@ -362,12 +351,12 @@ export function ServiceContextPanel() {
           {compareMode && comparedItems.length >= 2 && (
             <div className="p-2.5 rounded-xl bg-slate-900/95 border border-[#22D3EE]/40 overflow-x-auto apex-scroll">
               <div className="text-[11px] font-semibold text-[#22D3EE] mb-2">
-                {isEn ? 'Side-by-Side Comparison (Estimates)' : 'Paghahambing ng Units (Estimate)'}
+                {tr('Side-by-Side Comparison (Estimates)', 'Paghahambing ng Units (Estimate)')}
               </div>
               <table className="w-full text-[11px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 text-slate-300">
-                    <th className="py-1 pr-2 font-medium">Spec</th>
+                    <th className="py-1 pr-2 font-medium">{tr('Spec')}</th>
                     {comparedItems.map((c) => (
                       <th key={c.id} className="py-1 px-1.5 font-semibold text-white">
                         {c.nameEn.split(' ').slice(0, 2).join(' ')}
@@ -377,7 +366,7 @@ export function ServiceContextPanel() {
                 </thead>
                 <tbody className="divide-y divide-white/10 text-slate-200 font-mono-tabular">
                   <tr>
-                    <td className="py-1.5 pr-2 text-slate-400 font-sans">Capacity</td>
+                    <td className="py-1.5 pr-2 text-slate-400 font-sans">{tr('Capacity')}</td>
                     {comparedItems.map((c) => (
                       <td key={c.id} className="py-1.5 px-1.5">
                         {c.hpMin}–{c.hpMax} HP
@@ -385,7 +374,7 @@ export function ServiceContextPanel() {
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-2 text-slate-400 font-sans">Inverter</td>
+                    <td className="py-1.5 pr-2 text-slate-400 font-sans">{tr('Inverter')}</td>
                     {comparedItems.map((c) => (
                       <td key={c.id} className="py-1.5 px-1.5">
                         {c.inverter ? 'Yes' : 'No'}
@@ -393,7 +382,7 @@ export function ServiceContextPanel() {
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-2 text-slate-400 font-sans">Noise</td>
+                    <td className="py-1.5 pr-2 text-slate-400 font-sans">{tr('Noise')}</td>
                     {comparedItems.map((c) => (
                       <td key={c.id} className="py-1.5 px-1.5">
                         {c.noiseDba}
@@ -401,7 +390,7 @@ export function ServiceContextPanel() {
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-2 text-slate-400 font-sans">Est. Price</td>
+                    <td className="py-1.5 pr-2 text-slate-400 font-sans">{tr('Est. Price')}</td>
                     {comparedItems.map((c) => (
                       <td key={c.id} className="py-1.5 px-1.5 text-[#22D3EE]">
                         {c.priceEstimatePhp.split('(')[0].trim()}
@@ -418,12 +407,12 @@ export function ServiceContextPanel() {
             <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
               <Calculator className="w-3.5 h-3.5 text-[#22D3EE]" />
               <span>
-                {isEn ? 'Room Size → HP/BTU Helper (Estimate)' : 'Room Size → HP/BTU Calculator (Estimate)'}
+                {tr('Room Size → HP/BTU Helper (Estimate)', 'Room Size → HP/BTU Calculator (Estimate)')}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-300">Floor Area (sqm)</span>
+                <span className="text-[11px] text-slate-300">{tr('Floor Area (sqm)')}</span>
                 <input
                   type="number"
                   min={8}
@@ -436,7 +425,7 @@ export function ServiceContextPanel() {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-300">Sun Exposure</span>
+                <span className="text-[11px] text-slate-300">{tr('Sun Exposure')}</span>
                 <select
                   value={roomCalc.sunExposure}
                   onChange={(e) =>
@@ -446,13 +435,13 @@ export function ServiceContextPanel() {
                   }
                   className="w-full px-2 py-1.5 rounded bg-slate-950 border border-white/15 text-white text-xs"
                 >
-                  <option value="shaded">Shaded</option>
-                  <option value="normal">Normal</option>
-                  <option value="direct_sun">Direct Sun (West)</option>
+                  <option value="shaded">{tr('Shaded')}</option>
+                  <option value="normal">{tr('Normal')}</option>
+                  <option value="direct_sun">{tr('Direct Sun (West)')}</option>
                 </select>
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-300">Occupants</span>
+                <span className="text-[11px] text-slate-300">{tr('Occupants')}</span>
                 <input
                   type="number"
                   min={1}
@@ -465,7 +454,7 @@ export function ServiceContextPanel() {
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-[11px] text-slate-300">Heat Appliances</span>
+                <span className="text-[11px] text-slate-300">{tr('Heat Appliances')}</span>
                 <input
                   type="number"
                   min={0}
@@ -480,7 +469,7 @@ export function ServiceContextPanel() {
             </div>
             <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
               <span className="text-slate-300">
-                {isEn ? 'Suggested Capacity (Est.):' : 'Estimate na HP/BTU:'}
+                {tr('Suggested Capacity (Est.):', 'Estimate na HP/BTU:')}
               </span>
               <span className="font-mono-tabular font-bold text-[#22D3EE]">
                 {capacityEst.recommendedHp} HP · {capacityEst.estimatedBtu.toLocaleString()} BTU
@@ -489,7 +478,7 @@ export function ServiceContextPanel() {
           </div>
 
           <p className="text-[11px] text-slate-400 leading-snug">
-            {isEn ? siteConfig.pricingDisclaimer.en : siteConfig.pricingDisclaimer.taglish}
+            {tr(siteConfig.pricingDisclaimer.en, siteConfig.pricingDisclaimer.taglish)}
           </p>
 
           <button
@@ -497,9 +486,7 @@ export function ServiceContextPanel() {
             onClick={() => setQuoteModalOpen(true)}
             className="w-full py-2.5 px-4 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-semibold transition-colors min-h-[42px]"
           >
-            {isEn
-              ? `Request a Quote for ${selectedEquip.nameEn}`
-              : `Magpa-Quote para sa ${selectedEquip.nameTaglish}`}
+            {tr(`Request a Quote for ${selectedEquip.nameEn}`, `Magpa-Quote para sa ${selectedEquip.nameTaglish}`, `获取 ${tr(selectedEquip.nameEn)} 的报价`)}
           </button>
         </div>
       )}
@@ -509,12 +496,10 @@ export function ServiceContextPanel() {
         <div className="space-y-3.5">
           <div>
             <h2 className="font-display text-base font-bold text-white">
-              {isEn ? '04. Full Installation' : '04. Kumpletong Pagkabit'}
+              {tr('04. Full Installation', '04. Kumpletong Pagkabit')}
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              {isEn
-                ? 'Step through our 7-stage engineered installation workflow.'
-                : 'Sundan ang 7 hakbang ng maayos na pagkabit sa 3D.'}
+              {tr('Step through our 7-stage engineered installation workflow.', 'Sundan ang 7 hakbang ng maayos na pagkabit sa 3D.')}
             </p>
           </div>
 
@@ -539,7 +524,7 @@ export function ServiceContextPanel() {
                 Step {activeInstallStep.step} of 7
               </div>
               <div className="text-xs font-semibold text-white">
-                {isEn ? activeInstallStep.titleEn : activeInstallStep.titleTaglish}
+                {tr(activeInstallStep.titleEn, activeInstallStep.titleTaglish)}
               </div>
             </div>
             <button
@@ -560,7 +545,7 @@ export function ServiceContextPanel() {
 
           <div className="p-3 rounded-xl bg-slate-900/80 border border-white/10 space-y-2 text-xs text-slate-200">
             <p className="leading-relaxed">
-              {isEn ? activeInstallStep.summaryEn : activeInstallStep.summaryTaglish}
+              {tr(activeInstallStep.summaryEn, activeInstallStep.summaryTaglish)}
             </p>
             {activeInstallStep.readings && (
               <div className="grid grid-cols-1 gap-1.5 pt-2 border-t border-white/10">
@@ -583,7 +568,7 @@ export function ServiceContextPanel() {
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#22D3EE]/15 border border-[#22D3EE]/50 text-[#22D3EE] text-xs font-medium mt-1"
               >
                 <Play className="w-3 h-3" />
-                <span>{isEn ? 'Replay Pipe Route Draw' : 'Ulitin ang Pipe Route'}</span>
+                <span>{tr('Replay Pipe Route Draw', 'Ulitin ang Pipe Route')}</span>
               </button>
             )}
           </div>
@@ -615,7 +600,7 @@ export function ServiceContextPanel() {
                     }`}
                   />
                   <span className="truncate">
-                    {st.step}. {isEn ? st.titleEn : st.titleTaglish}
+                    {st.step}. {tr(st.titleEn, st.titleTaglish)}
                   </span>
                 </button>
               );

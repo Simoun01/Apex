@@ -2,6 +2,7 @@ import { Html } from '@react-three/drei';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { getPartHighlightState } from './hvacSceneUtils';
+import { tr } from '../../i18n/tr';
 
 interface HotspotProps {
   partId: string;
@@ -32,8 +33,8 @@ export function Hotspot({ partId, position }: HotspotProps) {
 
   const isSelected = selectedPart === partId;
   const isHighlighted = state === 'highlighted' || state === 'selected';
-  const label = language === 'en' ? part.nameEn : part.nameTaglish;
-  const desc = language === 'en' ? part.whatItDoesEn : part.whatItDoesTaglish;
+  const label = tr(part.nameEn, part.nameTaglish);
+  const desc = tr(part.whatItDoesEn, part.whatItDoesTaglish);
 
   const handleActivate = () => {
     markInteracted();
@@ -47,7 +48,7 @@ export function Hotspot({ partId, position }: HotspotProps) {
     <Html
       position={position}
       center
-      distanceFactor={7.5}
+      distanceFactor={4.2}
       zIndexRange={[15, 0]}
       occlude={false}
     >
@@ -77,7 +78,7 @@ export function Hotspot({ partId, position }: HotspotProps) {
 
         {/* Clean label on hover or when selected */}
         <div
-          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-white/15 text-[11px] font-medium text-white whitespace-nowrap transition-opacity duration-150 ${
+          className={`pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 px-1.5 py-px rounded bg-[#0B1F3A]/95 border border-white/15 text-[9px] font-medium leading-tight text-white whitespace-nowrap transition-opacity duration-150 ${
             isSelected || hoveredPart === partId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         >

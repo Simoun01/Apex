@@ -18,6 +18,7 @@ import { siteConfig } from '../../config/siteConfig';
 import { ServiceMode } from '../../data/hvacData';
 import { MobileSheetSnap, useHVACStore } from '../../store/useHVACStore';
 import { ServiceContextPanel } from './ServiceContextPanel';
+import { tr } from '../../i18n/tr';
 
 const SERVICE_TABS: { id: ServiceMode; label: string; Icon: typeof Wrench }[] = [
   { id: 'repair', label: 'Repair', Icon: Wrench },
@@ -74,7 +75,7 @@ export function MobileSheet() {
         <div className="pointer-events-auto mx-3 mb-2 p-3.5 rounded-2xl bg-[#0B1F3A]/95 border border-[#22D3EE]/40 shadow-2xl space-y-2.5 max-h-[55vh] overflow-y-auto">
           <div className="flex items-center justify-between">
             <h3 className="font-display text-sm font-bold text-white">
-              {isEn ? 'Why Apex & Service Area' : 'Bakit Apex & Lugar'}
+              {tr('Why Apex & Service Area', 'Bakit Apex & Lugar')}
             </h3>
             <button
               type="button"
@@ -88,9 +89,9 @@ export function MobileSheet() {
           <div className="grid grid-cols-1 gap-2">
             {siteConfig.trustPoints.map((tp) => (
               <div key={tp.id} className="text-xs">
-                <div className="font-semibold text-[#22D3EE]">{isEn ? tp.en : tp.taglish}</div>
+                <div className="font-semibold text-[#22D3EE]">{tr(tp.en, tp.taglish)}</div>
                 <div className="text-slate-300 text-[11px]">
-                  {isEn ? tp.detailEn : tp.detailTaglish}
+                  {tr(tp.detailEn, tp.detailTaglish)}
                 </div>
               </div>
             ))}
@@ -98,7 +99,7 @@ export function MobileSheet() {
           <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300">
             <div className="flex items-center gap-1 font-semibold text-white mb-1">
               <MapPin className="w-3.5 h-3.5 text-[#F97316]" />
-              <span>Pampanga Service Areas</span>
+              <span>{tr('Pampanga Service Areas')}</span>
             </div>
             {siteConfig.serviceAreas.join(' · ')}
           </div>
@@ -135,7 +136,7 @@ export function MobileSheet() {
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Explode</span>
+          <span>{tr('Explode')}</span>
         </button>
 
         <button
@@ -149,7 +150,7 @@ export function MobileSheet() {
           }`}
         >
           <Eye className="w-4 h-4" />
-          <span>X-Ray</span>
+          <span>{tr('X-Ray')}</span>
         </button>
 
         <button
@@ -163,7 +164,7 @@ export function MobileSheet() {
           }`}
         >
           <Wind className="w-4 h-4" />
-          <span>Airflow</span>
+          <span>{tr('Airflow')}</span>
         </button>
 
         <button
@@ -177,7 +178,7 @@ export function MobileSheet() {
           }`}
         >
           <Flame className="w-4 h-4" />
-          <span>Heat</span>
+          <span>{tr('Heat')}</span>
         </button>
 
         <button
@@ -201,7 +202,7 @@ export function MobileSheet() {
           className="min-h-[44px] min-w-[44px] px-3 rounded-xl flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap shrink-0 border bg-[#0B1F3A]/92 text-slate-200 border-white/15"
         >
           <RotateCcw className="w-4 h-4" />
-          <span>Reset</span>
+          <span>{tr('Reset')}</span>
         </button>
       </div>
 
@@ -220,12 +221,8 @@ export function MobileSheet() {
             <span className="w-8 h-1 rounded-full bg-slate-500 inline-block" />
             <span className="text-xs font-semibold text-slate-200">
               {mobileSheetSnap === 'peek'
-                ? isEn
-                  ? 'Tap to explore services & details'
-                  : 'Pindutin para makita ang detalye'
-                : isEn
-                  ? 'Tap to resize panel'
-                  : 'Baguhin ang laki ng panel'}
+                ? tr('Tap to explore services & details', 'Pindutin para makita ang detalye')
+                : tr('Tap to resize panel', 'Baguhin ang laki ng panel')}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -236,7 +233,7 @@ export function MobileSheet() {
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-white/15 text-[11px] font-semibold text-[#22D3EE]"
             >
               <Phone className="w-3 h-3" />
-              <span>Call</span>
+              <span>{tr('Call')}</span>
             </a>
             <ChevronUp
               className={`w-4 h-4 text-[#22D3EE] transition-transform ${

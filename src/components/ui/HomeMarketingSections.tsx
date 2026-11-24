@@ -19,6 +19,7 @@ import { siteConfig } from '../../config/siteConfig';
 import { HOME_FAQ_ITEMS, getFaqAnswer, getFaqQuestion } from '../../data/homeFaqData';
 import { ServiceMode } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 
 interface ServiceMarketingCard {
   id: ServiceMode;
@@ -139,22 +140,16 @@ export function HomeMarketingSections() {
       >
         <div className="max-w-2xl space-y-2.5 mb-10 sm:mb-12">
           <p className="text-xs font-semibold tracking-wide text-[#67E8F9]">
-            {language === 'en'
-              ? 'San Matias, Pampanga · Residential & Commercial Cooling'
-              : 'San Matias, Pampanga · Serbisyo sa Bahay at Negosyo'}
+            {tr('San Matias, Pampanga · Residential & Commercial Cooling', 'San Matias, Pampanga · Serbisyo sa Bahay at Negosyo')}
           </p>
           <h2
             id="home-services-heading"
             className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-balance"
           >
-            {language === 'en'
-              ? 'Aircon Repair, Cleaning & Installation Services'
-              : 'Mga Serbisyong Aircon Repair, Cleaning & Installation'}
+            {tr('Aircon Repair, Cleaning & Installation Services', 'Mga Serbisyong Aircon Repair, Cleaning & Installation')}
           </h2>
           <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
-            {language === 'en'
-              ? 'From bedroom inverter aircons to multi-zone commercial HVAC plants across Central Luzon Region III—inspect every system in 3D or book a technician.'
-              : 'Mula inverter aircon sa kwarto hanggang commercial HVAC sa Central Luzon Region III—silipin bawat sistema sa 3D o magpa-schedule ng technician.'}
+            {tr('From bedroom inverter aircons to multi-zone commercial HVAC plants across Central Luzon Region III—inspect every system in 3D or book a technician.', 'Mula inverter aircon sa kwarto hanggang commercial HVAC sa Central Luzon Region III—silipin bawat sistema sa 3D o magpa-schedule ng technician.')}
           </p>
         </div>
 
@@ -178,10 +173,10 @@ export function HomeMarketingSections() {
                 />
               </div>
               <h3 className="font-display text-xl sm:text-2xl lg:text-[1.7rem] font-bold text-white leading-snug">
-                {language === 'en' ? featureService.headingEn : featureService.headingTaglish}
+                {tr(featureService.headingEn, featureService.headingTaglish)}
               </h3>
               <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-2xl">
-                {language === 'en' ? featureService.bodyEn : featureService.bodyTaglish}
+                {tr(featureService.bodyEn, featureService.bodyTaglish)}
               </p>
             </div>
 
@@ -203,7 +198,7 @@ export function HomeMarketingSections() {
                   className="bp-callout-btn group/btn text-xs sm:text-sm font-semibold cursor-pointer"
                 >
                   <span>
-                    {language === 'en' ? featureService.ctaEn : featureService.ctaTaglish}
+                    {tr(featureService.ctaEn, featureService.ctaTaglish)}
                   </span>
                   <span className="inline-flex items-center gap-1 shrink-0" aria-hidden="true">
                     <span className="bp-leader-line" />
@@ -241,10 +236,10 @@ export function HomeMarketingSections() {
                     />
                   </div>
                   <h3 className="font-display text-base sm:text-lg font-bold text-white leading-snug">
-                    {language === 'en' ? card.headingEn : card.headingTaglish}
+                    {tr(card.headingEn, card.headingTaglish)}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    {language === 'en' ? card.bodyEn : card.bodyTaglish}
+                    {tr(card.bodyEn, card.bodyTaglish)}
                   </p>
                 </div>
 
@@ -258,7 +253,7 @@ export function HomeMarketingSections() {
                       }
                       className="bp-callout-btn group/btn text-xs font-semibold text-left cursor-pointer"
                     >
-                      <span>{language === 'en' ? card.ctaEn : card.ctaTaglish}</span>
+                      <span>{tr(card.ctaEn, card.ctaTaglish)}</span>
                       <span className="inline-flex items-center gap-1 shrink-0" aria-hidden="true">
                         <span className="bp-leader-line" />
                         <ArrowRight
@@ -285,15 +280,13 @@ export function HomeMarketingSections() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 sm:mb-12">
             <div className="max-w-2xl space-y-2">
               <p className="text-xs font-semibold tracking-wide text-[#F97316]">
-                {language === 'en' ? 'Engineering Discipline' : 'Maayos at Garantisadong Gawa'}
+                {tr('Engineering Discipline', 'Maayos at Garantisadong Gawa')}
               </p>
               <h2
                 id="home-why-apex-heading"
                 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-balance"
               >
-                {language === 'en'
-                  ? 'Why Pampanga Homes & Businesses Choose Apex Mechanical'
-                  : 'Bakit Pinipili ang Apex Mechanical sa Pampanga'}
+                {tr('Why Pampanga Homes & Businesses Choose Apex Mechanical', 'Bakit Pinipili ang Apex Mechanical sa Pampanga')}
               </h2>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -303,7 +296,7 @@ export function HomeMarketingSections() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[2px] bg-slate-900 border border-cyan-300/25 hover:border-[#22D3EE]/60 text-xs font-semibold text-white transition-colors cursor-pointer"
               >
                 <Home className="w-3.5 h-3.5 text-[#22D3EE]" strokeWidth={1.5} aria-hidden="true" />
-                <span>Residential 3D</span>
+                <span>{tr('Residential 3D')}</span>
               </button>
               <button
                 type="button"
@@ -311,7 +304,7 @@ export function HomeMarketingSections() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[2px] bg-slate-900 border border-cyan-300/25 hover:border-[#F97316]/60 text-xs font-semibold text-white transition-colors cursor-pointer"
               >
                 <Building2 className="w-3.5 h-3.5 text-[#F97316]" strokeWidth={1.5} aria-hidden="true" />
-                <span>Commercial 3D</span>
+                <span>{tr('Commercial 3D')}</span>
               </button>
             </div>
           </div>
@@ -357,10 +350,10 @@ export function HomeMarketingSections() {
                   )}
 
                   <h3 className="font-display text-base font-bold text-white leading-snug">
-                    {language === 'en' ? pt.en : pt.taglish}
+                    {tr(pt.en, pt.taglish)}
                   </h3>
                   <p className="mt-1.5 text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    {language === 'en' ? pt.detailEn : pt.detailTaglish}
+                    {tr(pt.detailEn, pt.detailTaglish)}
                   </p>
                 </div>
               ))}
@@ -372,7 +365,7 @@ export function HomeMarketingSections() {
       {/* 3. THIN FULL-BLEED STATS BAND — VISUAL BREATHER */}
       {/* [PLACEHOLDER] Key metrics values in siteConfig.keyMetrics — replace with verified company figures */}
       <section
-        aria-label={language === 'en' ? 'Apex Mechanical Key Figures' : 'Mahahalagang Datos ng Apex Mechanical'}
+        aria-label={tr('Apex Mechanical Key Figures', 'Mahahalagang Datos ng Apex Mechanical')}
         className="w-full bg-[#061325] border-y border-cyan-300/20"
       >
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-9 sm:py-11">
@@ -403,7 +396,7 @@ export function HomeMarketingSections() {
                   style={{ fontFamily: 'var(--font-tech-mono)' }}
                   className="mt-1.5 text-[10px] sm:text-[11px] uppercase tracking-[0.14em] text-[#67E8F9]"
                 >
-                  {language === 'en' ? metric.labelEn : metric.labelTaglish}
+                  {tr(metric.labelEn, metric.labelTaglish)}
                 </div>
               </div>
             ))}
@@ -423,21 +416,17 @@ export function HomeMarketingSections() {
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10 sm:mb-14">
             <div className="max-w-2xl space-y-2.5">
               <p className="text-xs font-semibold tracking-wide text-[#67E8F9]">
-                {language === 'en' ? 'Local Dispatch From San Matias' : 'Mabilis na Dispatch Mula San Matias'}
+                {tr('Local Dispatch From San Matias', 'Mabilis na Dispatch Mula San Matias')}
               </p>
               <h2
                 id="home-areas-heading"
                 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-balance"
               >
-                {language === 'en'
-                  ? 'Serving San Matias, Pampanga & Central Luzon Region III'
-                  : 'Sakop na Lugar sa Pampanga at Central Luzon Region III'}
+                {tr('Serving San Matias, Pampanga & Central Luzon Region III', 'Sakop na Lugar sa Pampanga at Central Luzon Region III')}
               </h2>
             </div>
             <p className="text-sm text-slate-200 leading-relaxed max-w-md">
-              {language === 'en'
-                ? 'Fast residential aircon maintenance, cleaning, repair, and commercial HVAC project coverage across every major town, city, and business zone:'
-                : 'Abot ang residential aircon cleaning, repair, installation, at commercial HVAC sa mga sumusunod na bayan at lungsod:'}
+              {tr('Fast residential aircon maintenance, cleaning, repair, and commercial HVAC project coverage across every major town, city, and business zone:', 'Abot ang residential aircon cleaning, repair, installation, at commercial HVAC sa mga sumusunod na bayan at lungsod:')}
             </p>
           </div>
 
@@ -504,15 +493,13 @@ export function HomeMarketingSections() {
         <div className="max-w-[52rem] mx-auto px-5 sm:px-8 py-16 sm:py-24">
           <div className="text-center max-w-xl mx-auto space-y-2 mb-10 sm:mb-12">
             <p className="text-xs font-semibold tracking-wide text-[#67E8F9]">
-              {language === 'en' ? 'Common Questions' : 'Mga Madalas Itanong'}
+              {tr('Common Questions', 'Mga Madalas Itanong')}
             </p>
             <h2
               id="home-faq-heading"
               className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-balance"
             >
-              {language === 'en'
-                ? 'Frequently Asked Questions About Aircon Service in Pampanga'
-                : 'FAQ Tungkol sa Aircon Service sa Pampanga'}
+              {tr('Frequently Asked Questions About Aircon Service in Pampanga', 'FAQ Tungkol sa Aircon Service sa Pampanga')}
             </h2>
           </div>
 
@@ -606,14 +593,10 @@ export function HomeMarketingSections() {
                 id="home-contact-heading"
                 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-balance"
               >
-                {language === 'en'
-                  ? 'Book a Free Aircon Site Assessment in Pampanga'
-                  : 'Magpa-Schedule ng Libreng Aircon Site Assessment sa Pampanga'}
+                {tr('Book a Free Aircon Site Assessment in Pampanga', 'Magpa-Schedule ng Libreng Aircon Site Assessment sa Pampanga')}
               </h2>
               <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-2xl">
-                {language === 'en'
-                  ? `Need fast aircon repair, deep cleaning, or a new inverter or commercial HVAC quote? Our San Matias team responds within ${siteConfig.contact.responseHours}.`
-                  : `Kailangan ng aircon repair, cleaning, o bagong inverter / commercial HVAC quote? Sasagot ang San Matias team sa loob ng ${siteConfig.contact.responseHours}.`}
+                {tr(`Need fast aircon repair, deep cleaning, or a new inverter or commercial HVAC quote? Our San Matias team responds within ${siteConfig.contact.responseHours}.`, `Kailangan ng aircon repair, cleaning, o bagong inverter / commercial HVAC quote? Sasagot ang San Matias team sa loob ng ${siteConfig.contact.responseHours}.`, `需要快速维修、深度清洗，或新的变频空调/商用暖通报价？我们的 San Matias 团队会在 ${siteConfig.contact.responseHours} 内回复。`)}
               </p>
 
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-200">
@@ -654,15 +637,13 @@ export function HomeMarketingSections() {
                 aria-label="Open free aircon quote and site assessment form"
                 className="px-6 py-3.5 rounded-[2px] bg-[#F97316] hover:bg-[#ea580c] text-white font-display font-bold text-sm sm:text-base transition-colors shadow-lg cursor-pointer"
               >
-                {language === 'en' ? 'Get a Free Quote' : 'Humiling ng Libreng Quote'}
+                {tr('Get a Free Quote', 'Humiling ng Libreng Quote')}
               </button>
               <a
                 href={siteConfig.contact.phoneHref}
                 className="px-6 py-3 rounded-[2px] bg-slate-900 hover:bg-slate-800 border border-cyan-300/25 text-center text-sm font-semibold text-slate-100 transition-colors"
               >
-                {language === 'en'
-                  ? `Call ${siteConfig.contact.phoneDisplay}`
-                  : `Tumawag: ${siteConfig.contact.phoneDisplay}`}
+                {tr(`Call ${siteConfig.contact.phoneDisplay}`, `Tumawag: ${siteConfig.contact.phoneDisplay}`, `致电 ${siteConfig.contact.phoneDisplay}`)}
               </a>
             </div>
           </div>
@@ -676,9 +657,7 @@ export function HomeMarketingSections() {
             © {new Date().getFullYear()} {siteConfig.brand.name} · {siteConfig.brand.locationLabel}
           </p>
           <p>
-            {language === 'en'
-              ? siteConfig.pricingDisclaimer.en
-              : siteConfig.pricingDisclaimer.taglish}
+            {tr(siteConfig.pricingDisclaimer.en, siteConfig.pricingDisclaimer.taglish)}
           </p>
         </div>
       </footer>

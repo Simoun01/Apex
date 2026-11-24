@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 import {
   createCopperPatinaMaps,
   createFilterMeshTexture,
@@ -588,27 +589,27 @@ export function SplitUnitIndoor({
 
       {exploded && (
         <>
-          <Html position={[0, 0.44, 0.35]} center distanceFactor={6.5}>
-            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-              Filter Mesh
+          <Html position={[0, 0.44, 0.35]} center distanceFactor={3.8}>
+            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+              {tr('Filter Mesh')}
             </div>
           </Html>
-          <Html position={[0, 0.04, 0.48]} center distanceFactor={6.5}>
-            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-              Front Casing &amp; Louvers
+          <Html position={[0, 0.04, 0.48]} center distanceFactor={3.8}>
+            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+              {tr('Front Casing & Louvers')}
             </div>
           </Html>
-          <Html position={[0.75, -0.02, 0.18]} center distanceFactor={6.5}>
-            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-              Inverter PCB
+          <Html position={[0.75, -0.02, 0.18]} center distanceFactor={3.8}>
+            <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+              {tr('Inverter PCB')}
             </div>
           </Html>
         </>
       )}
 
       {labelTag && (
-        <Html position={[0, 0.28, 0.08]} center distanceFactor={7}>
-          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[11px] font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
+        <Html position={[0, 0.28, 0.08]} center distanceFactor={4}>
+          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[10px] leading-tight font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
             {labelTag}
           </div>
         </Html>

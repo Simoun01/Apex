@@ -11,6 +11,7 @@ import { useHVACStore } from '../../store/useHVACStore';
 import { getShot, subscribeShots } from '../scene/shotStore';
 import type { Shot } from '../scene/ProductStudio';
 import type { InspectTarget } from './AirconInspector';
+import { tr } from '../../i18n/tr';
 
 const AirconInspector = lazy(() => import('./AirconInspector'));
 const ProductStudio = lazy(() => import('../scene/ProductStudio'));
@@ -233,18 +234,18 @@ function ProductCard({ def, en, hidden, onOpen }: { def: CardDef; en: boolean; h
       onClick={(e) => onOpen(def, e)}
       tabIndex={hidden ? -1 : 0}
       aria-hidden={hidden || undefined}
-      aria-label={hidden ? undefined : `${brandName(def.brandId)} ${en ? k.labelEn : k.labelTl}, ${def.variant}. ${en ? 'View in 3D with exploded parts' : 'Tingnan sa 3D kasama ang mga piyesa'}`}
+      aria-label={hidden ? undefined : `${brandName(def.brandId)} ${tr(k.labelEn, k.labelTl)}, ${def.variant}. ${tr('View in 3D with exploded parts', 'Tingnan sa 3D kasama ang mga piyesa')}`}
     >
       <span className="ph-card-media">
         {src ? <img src={src} alt="" decoding="async" draggable={false} /> : <span className="ph-skel" />}
         <span className="ph-card-hover">
           <Boxes className="w-3.5 h-3.5" aria-hidden="true" />
-          {en ? '3D & parts' : '3D at piyesa'}
+          {tr('3D & parts', '3D at piyesa')}
         </span>
       </span>
       <span className="ph-card-body">
         <span className="ph-card-brand">{brandName(def.brandId)}</span>
-        <span className="ph-card-name">{en ? k.labelEn : k.labelTl}</span>
+        <span className="ph-card-name">{tr(k.labelEn, k.labelTl)}</span>
         <span className="ph-card-meta">
           {def.variant} · {fmt(btu)} BTU/h
           {isInverter(def.catalogId) && def.kind !== 'window' ? <em>Inverter</em> : null}
@@ -254,19 +255,30 @@ function ProductCard({ def, en, hidden, onOpen }: { def: CardDef; en: boolean; h
   );
 }
 
-function CarouselColumn({ col, en, reduce, onOpen }: { col: ColumnDef; en: boolean; reduce: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>) => void }) {
+/** Minimum cards in one loop copy, so a copy is always taller than the column and the loop never shows a gap. */
+const MIN_LOOP = 8;
+
+function CarouselColumn({ col, en, onOpen }: { col: ColumnDef; en: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>) => void }) {
+  // Repeat the products until one copy is long enough, then render that copy twice for a seamless loop.
+  const copy: CardDef[] = [];
+  while (copy.length < Math.max(MIN_LOOP, col.cards.length)) copy.push(...col.cards);
+  // Speed stays constant per card, however many repeats were needed.
+  const dur = (col.dur * copy.length) / col.cards.length;
   return (
-    <section className="ph-col" data-dir={col.dir} data-accent={col.accent} aria-label={en ? col.en : col.tl}>
+    <section className="ph-col" data-dir={col.dir} data-accent={col.accent} aria-label={tr(col.en, col.tl)}>
       <header className="ph-col-head">
-        <span className="ph-col-title">{en ? col.en : col.tl}</span>
-        <span className="ph-col-sub">{en ? col.subEn : col.subTl}</span>
+        <span className="ph-col-title">{tr(col.en, col.tl)}</span>
+        <span className="ph-col-sub">{tr(col.subEn, col.subTl)}</span>
       </header>
-      <div className="ph-viewport" data-static={reduce || undefined}>
-        <div className="ph-track" style={{ '--ph-dur': `${col.dur}s` } as CSSProperties}>
-          {col.cards.map((d) => (
-            <ProductCard key={d.key} def={d} en={en} onOpen={onOpen} />
+      <div className="ph-viewport">
+        <div className="ph-track" style={{ '--ph-dur': `${dur}s` } as CSSProperties}>
+          {copy.map((d, i) => (
+            // Only the first appearance of each product is focusable; repeats are decorative.
+            <ProductCard key={`${d.key}-a${i}`} def={d} en={en} hidden={i >= col.cards.length} onOpen={onOpen} />
           ))}
-          {!reduce && col.cards.map((d) => <ProductCard key={`${d.key}-b`} def={d} en={en} hidden onOpen={onOpen} />)}
+          {copy.map((d, i) => (
+            <ProductCard key={`${d.key}-b${i}`} def={d} en={en} hidden onOpen={onOpen} />
+          ))}
         </div>
       </div>
     </section>
@@ -347,7 +359,7 @@ export function ProductShowroomHero() {
 
   const featureFallback = (
     <div className="ph-feature-fallback">
-      <p>{en ? '3D preview is not available on this device.' : 'Hindi available ang 3D preview sa device na ito.'}</p>
+      <p>{tr('3D preview is not available on this device.', 'Hindi available ang 3D preview sa device na ito.')}</p>
     </div>
   );
 
@@ -361,34 +373,32 @@ export function ProductShowroomHero() {
             {siteConfig.brand.name} <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
           </p>
           <h1 id="showroom-heading" className="ph-title">
-            {en ? 'Professional HVAC Services & High-Quality Aircon Products' : 'Propesyonal na HVAC Services at De-kalidad na Aircon'}
+            {tr('Professional HVAC Services & High-Quality Aircon Products', 'Propesyonal na HVAC Services at De-kalidad na Aircon')}
           </h1>
           <p className="ph-lede">
-            {en
-              ? 'From top-tier split-type, window, and commercial AC units to expert installation and emergency repairs, we have your comfort covered. Get high-efficiency systems backed by certified local technicians. Explore our products and book today.'
-              : 'Mula split-type, window, at commercial AC hanggang expert installation at emergency repair, sagot namin ang ginhawa mo. High-efficiency systems na may certified local technicians. Silipin ang mga produkto at mag-book ngayon.'}
+            {tr('From top-tier split-type, window, and commercial AC units to expert installation and emergency repairs, we have your comfort covered. Get high-efficiency systems backed by certified local technicians. Explore our products and book today.', 'Mula split-type, window, at commercial AC hanggang expert installation at emergency repair, sagot namin ang ginhawa mo. High-efficiency systems na may certified local technicians. Silipin ang mga produkto at mag-book ngayon.')}
           </p>
         </header>
 
         <div className="ph-stage">
-          <CarouselColumn col={COLUMNS[0]} en={en} reduce={reduce} onOpen={openFromCard} />
-          <CarouselColumn col={COLUMNS[1]} en={en} reduce={reduce} onOpen={openFromCard} />
+          <CarouselColumn col={COLUMNS[0]} en={en} onOpen={openFromCard} />
+          <CarouselColumn col={COLUMNS[1]} en={en} onOpen={openFromCard} />
 
           {/* ── Featured unit ── */}
           <div className="ph-feature" ref={featureRef} style={{ '--ph-brand': featureAccent } as CSSProperties}>
             <div className="ph-feature-top">
               <div>
                 <p className="ph-feature-eyebrow">
-                  {en ? 'Featured' : 'Tampok'} · {en ? k.labelEn : k.labelTl}
+                  {tr('Featured', 'Tampok')} · {tr(k.labelEn, k.labelTl)}
                 </p>
                 <h2 className="ph-feature-title">
-                  {brandName(brandId)} <span>{en ? item?.nameEn : item?.nameTaglish}</span>
+                  {brandName(brandId)} <span>{tr(item?.nameEn, item?.nameTaglish)}</span>
                 </h2>
                 <p className="ph-feature-meta">
                   {FEATURE_VARIANT[kind]} · {fmt(featureBtu)} BTU/h · {item?.efficiencyTier}
                 </p>
               </div>
-              <div className="ph-brands" role="radiogroup" aria-label={en ? 'Brand' : 'Brand'}>
+              <div className="ph-brands" role="radiogroup" aria-label={tr('Brand', 'Brand')}>
                 {BRANDS.map((b) => (
                   <button
                     key={b.id}
@@ -414,14 +424,14 @@ export function ProductShowroomHero() {
                   <ShowroomFeature kind={kind} brandId={brandId} exploded={exploded} en={en} reduceMotion={reduce} onInteract={() => setHeld(true)} />
                 </Suspense>
               </Quiet>
-              {exploded && <p className="ph-canvas-hint">{en ? 'Drag to turn · each part is labelled' : 'I-drag para iikot · may label ang bawat piyesa'}</p>}
+              {exploded && <p className="ph-canvas-hint">{tr('Drag to turn · each part is labelled', 'I-drag para iikot · may label ang bawat piyesa')}</p>}
             </div>
 
             <div className="ph-feature-bar">
-              <div className="ph-kinds" role="tablist" aria-label={en ? 'Variety' : 'Uri'}>
+              <div className="ph-kinds" role="tablist" aria-label={tr('Variety', 'Uri')}>
                 {FEATURE_ORDER.map((kk) => (
                   <button key={kk} type="button" role="tab" aria-selected={kk === kind} className={`ph-kind${kk === kind ? ' is-on' : ''}`} onClick={() => pickKind(kk)}>
-                    {en ? SHORT_KIND[kk][0] : SHORT_KIND[kk][1]}
+                    {tr(SHORT_KIND[kk][0], SHORT_KIND[kk][1])}
                   </button>
                 ))}
               </div>
@@ -436,36 +446,36 @@ export function ProductShowroomHero() {
                   }}
                 >
                   <Boxes className="w-4 h-4" aria-hidden="true" />
-                  {exploded ? (en ? 'Assemble' : 'Ibalik') : en ? 'Exploded view' : 'Exploded view'}
+                  {exploded ? (tr('Assemble', 'Ibalik')) : tr('Exploded view', 'Exploded view')}
                 </button>
                 <button type="button" className="ph-act ph-act--solid" onClick={() => openFeature(exploded)}>
                   <Maximize2 className="w-4 h-4" aria-hidden="true" />
-                  {en ? 'Full specs' : 'Buong specs'}
+                  {tr('Full specs', 'Buong specs')}
                 </button>
               </div>
             </div>
           </div>
 
-          <CarouselColumn col={COLUMNS[2]} en={en} reduce={reduce} onOpen={openFromCard} />
-          <CarouselColumn col={COLUMNS[3]} en={en} reduce={reduce} onOpen={openFromCard} />
+          <CarouselColumn col={COLUMNS[2]} en={en} onOpen={openFromCard} />
+          <CarouselColumn col={COLUMNS[3]} en={en} onOpen={openFromCard} />
         </div>
 
         <div className="ph-cta">
           <button type="button" onClick={() => enterExperience('residential', { service: 'equipment' })} className="ph-cta-btn">
             <Settings2 className="w-5 h-5" aria-hidden="true" />
-            {en ? 'Browse Aircon Products' : 'Tingnan ang mga Aircon'}
+            {tr('Browse Aircon Products', 'Tingnan ang mga Aircon')}
           </button>
           <button type="button" onClick={() => setQuoteModalOpen(true)} className="ph-cta-btn ph-cta-btn--primary">
             <CalendarCheck className="w-5 h-5" aria-hidden="true" />
-            {en ? 'Book a Service Appointment' : 'Mag-book ng Serbisyo'}
+            {tr('Book a Service Appointment', 'Mag-book ng Serbisyo')}
           </button>
         </div>
         <div className="mt-4 flex flex-col items-center gap-1 text-center">
           <p className="text-sm text-slate-300">
-            {en ? 'Explore products & service areas · Scroll down for full details' : 'Silipin ang mga produkto at lugar · Mag-scroll pababa para sa detalye'}
+            {tr('Explore products & service areas · Scroll down for full details', 'Silipin ang mga produkto at lugar · Mag-scroll pababa para sa detalye')}
           </p>
           <a href="#explore-3d" className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-semibold text-[#7dd3fc] hover:text-white transition-colors">
-            {en ? 'See our product range & service coverage' : 'Tingnan ang aming mga produkto at serbisyo'}
+            {tr('See our product range & service coverage', 'Tingnan ang aming mga produkto at serbisyo')}
             <ChevronDown className="w-4 h-4 animate-bounce" aria-hidden="true" />
           </a>
         </div>

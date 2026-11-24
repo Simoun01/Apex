@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Brand, UnitKind } from '../../data/airconBrands';
+import { tr } from '../../i18n/tr';
 
 /* ============================================================================
    Shared, detailed aircon models.
@@ -38,6 +39,8 @@ interface ExplodeCtxValue {
   ref: ExplodeRef;
   labels: boolean;
   en: boolean;
+  /** Multiplies every part's travel, so small views can spread parts further apart */
+  spread: number;
 }
 
 const ExplodeCtx = createContext<ExplodeCtxValue | null>(null);
@@ -46,14 +49,16 @@ export function ExplodeProvider({
   explodeRef,
   labels = false,
   en = true,
+  spread = 1,
   children,
 }: {
   explodeRef: ExplodeRef;
   labels?: boolean;
   en?: boolean;
+  spread?: number;
   children: ReactNode;
 }) {
-  const value = useMemo(() => ({ ref: explodeRef, labels, en }), [explodeRef, labels, en]);
+  const value = useMemo(() => ({ ref: explodeRef, labels, en, spread }), [explodeRef, labels, en, spread]);
   useFrame((_, dt) => {
     const s = explodeRef.current;
     if (Math.abs(s.target - s.amount) > 0.0005) s.amount += (s.target - s.amount) * Math.min(1, dt * 3.2);
@@ -92,10 +97,11 @@ export function Part({
   }, [dir[0], dir[1], dir[2]]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame(() => {
-    const a = ctx ? ease(ctx.ref.current.amount) : 0;
+    const a = ctx ? ease(ctx.ref.current.amount) * ctx.spread : 0;
     if (ref.current) ref.current.position.set(n.x * dist * a, n.y * dist * a, n.z * dist * a);
     if (label.current) {
-      const o = Math.max(0, Math.min(1, (a - 0.6) / 0.35));
+      const raw = ctx ? ease(ctx.ref.current.amount) : 0;
+      const o = Math.max(0, Math.min(1, (raw - 0.6) / 0.35));
       label.current.style.opacity = String(o);
       label.current.style.visibility = o > 0.01 ? 'visible' : 'hidden';
     }
@@ -107,7 +113,7 @@ export function Part({
       {ctx?.labels && (
         <Html position={at} center zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
           <div ref={label} className="am-label" style={{ opacity: 0, visibility: 'hidden' }}>
-            {ctx.en ? en : (tl ?? en)}
+            {tr(en, tl ?? en)}
           </div>
         </Html>
       )}

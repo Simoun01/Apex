@@ -11,8 +11,16 @@ import {
   X,
 } from 'lucide-react';
 import { siteConfig } from '../../config/siteConfig';
+import type { Language } from '../../data/hvacData';
+import { tr } from '../../i18n/tr';
 import { QualityTier, useHVACStore } from '../../store/useHVACStore';
 import { ApexLogo } from './ApexLogo';
+
+const LANGS: { id: Language; label: string; lang: string; title: string }[] = [
+  { id: 'en', label: 'EN', lang: 'en', title: 'English' },
+  { id: 'taglish', label: 'Taglish', lang: 'tl', title: 'Taglish' },
+  { id: 'zh', label: '中文', lang: 'zh-Hans', title: '简体中文 (Simplified Chinese)' },
+];
 
 export function TopBar() {
   const stage = useHVACStore((s) => s.stage);
@@ -53,7 +61,7 @@ export function TopBar() {
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#22D3EE]" aria-hidden="true" />
             <span className="hidden sm:inline">
-              {language === 'en' ? 'Back to Home' : 'Balik sa Home'}
+              {tr('Back to Home', 'Balik sa Home')}
             </span>
           </button>
         ) : (
@@ -68,7 +76,7 @@ export function TopBar() {
             {siteConfig.brand.name}
           </div>
           <div className="hidden md:block text-[11px] text-slate-300 whitespace-nowrap mt-0.5 leading-tight">
-            {language === 'en' ? siteConfig.brand.taglineEn : siteConfig.brand.taglineTaglish} · {siteConfig.brand.locationLabel}
+            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)} · {siteConfig.brand.locationLabel}
           </div>
         </div>
       </div>
@@ -81,13 +89,13 @@ export function TopBar() {
             className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-300 mr-1"
           >
             <a href="#services" className="hover:text-white transition-colors whitespace-nowrap">
-              {language === 'en' ? 'Services' : 'Serbisyo'}
+              {tr('Services', 'Serbisyo')}
             </a>
             <a href="#why-apex" className="hover:text-white transition-colors whitespace-nowrap">
-              Why Apex
+              {tr('Why Apex')}
             </a>
             <a href="#service-areas" className="hover:text-white transition-colors whitespace-nowrap">
-              {language === 'en' ? 'Service Areas' : 'Lugar'}
+              {tr('Service Areas', 'Lugar')}
             </a>
             <a href="#faq" className="hover:text-white transition-colors whitespace-nowrap">
               FAQ
@@ -113,7 +121,7 @@ export function TopBar() {
                 }`}
               >
                 <Home className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Residential</span>
+                <span>{tr('Residential')}</span>
               </button>
               <button
                 type="button"
@@ -127,21 +135,35 @@ export function TopBar() {
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Commercial</span>
+                <span>{tr('Commercial')}</span>
               </button>
             </div>
           </>
         )}
 
-        {/* EN / Taglish Toggle */}
-        <button
-          type="button"
-          onClick={() => setLanguage(language === 'en' ? 'taglish' : 'en')}
-          aria-label="Toggle language between English and Taglish"
-          className="hidden sm:inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-white/12 text-xs font-medium text-slate-200 hover:text-white hover:border-[#22D3EE]/50 transition-colors whitespace-nowrap shrink-0 min-h-[36px] cursor-pointer"
+        {/* Language switch: English / Taglish / 中文 */}
+        <div
+          role="radiogroup"
+          aria-label="Language"
+          className="hidden sm:inline-flex items-center p-0.5 rounded-lg bg-slate-900/90 border border-white/12 shrink-0 min-h-[36px]"
         >
-          {language === 'en' ? 'EN / Taglish' : 'Taglish / EN'}
-        </button>
+          {LANGS.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="radio"
+              aria-checked={language === l.id}
+              lang={l.lang}
+              title={l.title}
+              onClick={() => setLanguage(l.id)}
+              className={`px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                language === l.id ? 'bg-[#22D3EE]/20 text-white' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
 
         {/* Why Apex / Pampanga Area Drawer Trigger (Stage 2) */}
         {!isHome && (
@@ -157,7 +179,7 @@ export function TopBar() {
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>{language === 'en' ? 'Why Apex & Area' : 'Why Apex & Lugar'}</span>
+            <span>{tr('Why Apex & Area', 'Why Apex & Lugar')}</span>
           </button>
         )}
 
@@ -178,21 +200,28 @@ export function TopBar() {
               <div className="flex items-center justify-between text-xs font-semibold text-white">
                 <span className="flex items-center gap-1.5">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-[#22D3EE]" />
-                  Scene &amp; Accessibility
+                  {tr('Scene & Accessibility')}
                 </span>
               </div>
 
               {/* Language on mobile */}
               <div className="sm:hidden flex items-center justify-between">
-                <span className="text-xs text-slate-300">Language</span>
-                <button
-                  type="button"
-                  aria-label="Toggle language between English and Taglish"
-                  onClick={() => setLanguage(language === 'en' ? 'taglish' : 'en')}
-                  className="px-2.5 py-1 rounded bg-slate-800 border border-white/15 text-xs text-white"
-                >
-                  {language === 'en' ? 'English' : 'Taglish'}
-                </button>
+                <span className="text-xs text-slate-300">{tr('Language', 'Wika', '语言')}</span>
+                <div role="radiogroup" aria-label="Language" className="inline-flex p-0.5 rounded bg-slate-800 border border-white/15">
+                  {LANGS.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={language === l.id}
+                      lang={l.lang}
+                      onClick={() => setLanguage(l.id)}
+                      className={`px-2 py-0.5 rounded text-xs ${language === l.id ? 'bg-[#22D3EE]/25 text-white' : 'text-slate-300'}`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Quality Tier */}
@@ -227,7 +256,7 @@ export function TopBar() {
 
               {/* Reduce Motion */}
               <label className="flex items-center justify-between gap-2 cursor-pointer">
-                <span className="text-xs text-slate-200">Reduce Motion</span>
+                <span className="text-xs text-slate-200">{tr('Reduce Motion')}</span>
                 <input
                   type="checkbox"
                   aria-label="Reduce 3D motion and animations"
@@ -262,7 +291,7 @@ export function TopBar() {
                   className="lg:hidden w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/15 text-xs font-medium text-white transition-colors"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-[#22D3EE]" />
-                  <span>Why Apex &amp; Service Area</span>
+                  <span>{tr('Why Apex & Service Area')}</span>
                 </button>
               )}
             </div>
@@ -286,7 +315,7 @@ export function TopBar() {
           aria-label="Open free aircon quote and site assessment form"
           className="px-3 sm:px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 min-h-[38px] shadow-md cursor-pointer"
         >
-          {language === 'en' ? 'Get a Free Quote' : 'Libreng Quote'}
+          {tr('Get a Free Quote', 'Libreng Quote')}
         </button>
       </div>
     </header>

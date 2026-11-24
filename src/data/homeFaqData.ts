@@ -1,4 +1,5 @@
 import { Language } from './hvacData';
+import { tr } from '../i18n/tr';
 
 export interface FaqItem {
   id: string;
@@ -66,9 +67,9 @@ export const HOME_FAQ_ITEMS: FaqItem[] = [
 ];
 
 export function getFaqQuestion(item: FaqItem, lang: Language): string {
-  return lang === 'en' ? item.questionEn : item.questionTaglish;
+  return tr(item.questionEn, item.questionTaglish);
 }
 
 export function getFaqAnswer(item: FaqItem, lang: Language): string {
-  return lang === 'en' ? item.answerEn : item.answerTaglish;
+  return tr(item.answerEn, item.answerTaglish);
 }

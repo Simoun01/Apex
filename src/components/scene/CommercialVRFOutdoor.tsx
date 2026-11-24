@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { getPartHighlightState } from './hvacSceneUtils';
+import { tr } from '../../i18n/tr';
 
 const _emissiveCyan = new THREE.Color('#22D3EE');
 const _emissiveOrange = new THREE.Color('#F97316');
@@ -257,9 +258,9 @@ export function CommercialVRFOutdoor() {
         </group>
 
         {isChiller && (
-          <Html position={[0, 1.35, 0]} center distanceFactor={8}>
-            <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[11px] font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
-              Chilled-Water Plant (Consultative)
+          <Html position={[0, 1.35, 0]} center distanceFactor={4.6}>
+            <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[10px] leading-tight font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
+              {tr('Chilled-Water Plant (Consultative)')}
             </div>
           </Html>
         )}

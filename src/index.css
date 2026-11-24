@@ -2,8 +2,9 @@
 
 @layer base {
   :root {
-    --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+    /* CJK fallbacks so 中文 renders in a clean system font (PingFang / YaHei / Noto) */
+    --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    --font-body: 'DM Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
     --font-tech-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
@@ -788,12 +789,12 @@ textarea:focus-visible {
 /* Exploded-view part labels (3D overlay) */
 .am-label {
   white-space: nowrap;
-  padding: 4px 9px;
+  padding: 3px 7px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(6, 16, 31, 0.86);
   color: #e2e8f0;
-  font: 600 11px/1.2 var(--font-body);
+  font: 600 9.5px/1.2 var(--font-body);
   letter-spacing: 0.01em;
   box-shadow: 0 6px 16px rgba(2, 6, 23, 0.5);
   backdrop-filter: blur(4px);
@@ -931,11 +932,8 @@ textarea:focus-visible {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
 }
-.ph-viewport[data-static] {
-  overflow-y: auto;
-  -webkit-mask-image: none;
-  mask-image: none;
-}
+.ph-viewport { scrollbar-width: none; }
+.ph-viewport::-webkit-scrollbar { display: none; }
 .ph-track {
   display: flex;
   flex-direction: column;
@@ -944,7 +942,20 @@ textarea:focus-visible {
   will-change: transform;
 }
 .ph-col[data-dir='down'] .ph-track { animation-name: ph-down; }
-.ph-viewport[data-static] .ph-track { animation: none; }
+
+/* The carousels always run (requested), even when the device asks for reduced motion:
+   the site-wide reduced-motion rule below would otherwise freeze them. They stay slow
+   and pause on hover / focus. */
+@media (prefers-reduced-motion: reduce) {
+  .ph-viewport .ph-track {
+    animation-duration: var(--ph-dur, 48s) !important;
+    animation-iteration-count: infinite !important;
+  }
+  .ph-viewport .ph-card-media img {
+    animation-duration: 500ms, 5.5s !important;
+    animation-iteration-count: 1, infinite !important;
+  }
+}
 .ph-col:hover .ph-track,
 .ph-col:focus-within .ph-track { animation-play-state: paused; }
 

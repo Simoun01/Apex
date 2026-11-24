@@ -1,6 +1,6 @@
 export type Audience = 'residential' | 'commercial';
 export type ServiceMode = 'repair' | 'cleaning' | 'equipment' | 'installation';
-export type Language = 'en' | 'taglish';
+export type Language = 'en' | 'taglish' | 'zh';
 export type CameraPreset = 'overview' | 'indoor' | 'outdoor' | 'piping' | 'top';
 
 export interface PartInfo {

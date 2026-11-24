@@ -22,6 +22,7 @@ import {
   getEquipmentById,
   useHVACStore,
 } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 
 export function QuoteModal() {
   const open = useHVACStore((s) => s.quoteModalOpen);
@@ -106,14 +107,12 @@ export function QuoteModal() {
     e.preventDefault();
     setErrorMsg('');
     if (!name.trim()) {
-      setErrorMsg(isEn ? 'Please enter your name.' : 'Pakilagay ang iyong pangalan.');
+      setErrorMsg(tr('Please enter your name.', 'Pakilagay ang iyong pangalan.'));
       return;
     }
     if (!validatePHMobile(mobile)) {
       setErrorMsg(
-        isEn
-          ? 'Enter a valid PH mobile number (e.g., 0917 123 4567).'
-          : 'Maglagay ng tamang PH mobile number (hal. 0917 123 4567).',
+        tr('Enter a valid PH mobile number (e.g., 0917 123 4567).', 'Maglagay ng tamang PH mobile number (hal. 0917 123 4567).'),
       );
       return;
     }
@@ -150,7 +149,7 @@ export function QuoteModal() {
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10">
           <div>
             <h2 id="quote-modal-title" className="font-display text-base font-bold text-white">
-              {isEn ? 'Request a Free Site Assessment & Quote' : 'Libreng Site Assessment & Quote'}
+              {tr('Request a Free Site Assessment & Quote', 'Libreng Site Assessment & Quote')}
             </h2>
             <p className="text-[11px] text-slate-300">
               {siteConfig.brand.locationLabel} · {siteConfig.contact.businessHours}
@@ -173,15 +172,11 @@ export function QuoteModal() {
                 <div className="flex items-center gap-2 text-emerald-300 font-semibold text-sm">
                   <CheckCircle2 className="w-5 h-5 shrink-0" />
                   <span>
-                    {isEn
-                      ? `Inquiry Prepared (Ref: ${submittedRecord.id})`
-                      : `Handa na ang Inquiry (Ref: ${submittedRecord.id})`}
+                    {tr(`Inquiry Prepared (Ref: ${submittedRecord.id})`, `Handa na ang Inquiry (Ref: ${submittedRecord.id})`, `咨询已生成（编号：${submittedRecord.id}）`)}
                   </span>
                 </div>
                 <p className="text-xs text-slate-200 leading-relaxed">
-                  {isEn
-                    ? `Your details are saved in this browser and formatted below. Tap your preferred channel to send it directly to our San Matias team — we typically reply within ${siteConfig.contact.responseHours}.`
-                    : `Naka-save na sa browser ang detalye. Pindutin ang napiling channel sa ibaba para direktang maipadala sa aming San Matias team — sasagot kami sa loob ng ${siteConfig.contact.responseHours}.`}
+                  {tr(`Your details are saved in this browser and formatted below. Tap your preferred channel to send it directly to our San Matias team — we typically reply within ${siteConfig.contact.responseHours}.`, `Naka-save na sa browser ang detalye. Pindutin ang napiling channel sa ibaba para direktang maipadala sa aming San Matias team — sasagot kami sa loob ng ${siteConfig.contact.responseHours}.`, `您的信息已保存在此浏览器中，并已整理如下。点击您偏好的渠道，即可直接发送给我们的 San Matias 团队——我们通常会在 ${siteConfig.contact.responseHours} 内回复。`)}
                 </p>
               </div>
 
@@ -192,7 +187,7 @@ export function QuoteModal() {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#22D3EE] text-[#0B1F3A] text-xs font-bold hover:opacity-90"
                 >
-                  <span>Send via Messenger</span>
+                  <span>{tr('Send via Messenger')}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
                 <a
@@ -201,14 +196,14 @@ export function QuoteModal() {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold hover:opacity-90"
                 >
-                  <span>Send via WhatsApp</span>
+                  <span>{tr('Send via WhatsApp')}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
                 <a
                   href={links.viber}
                   className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800 border border-white/15 text-white text-xs font-semibold hover:bg-slate-700"
                 >
-                  <span>Open in Viber</span>
+                  <span>{tr('Open in Viber')}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
                 <a
@@ -225,7 +220,7 @@ export function QuoteModal() {
                 onClick={handleClose}
                 className="w-full py-2 rounded-lg border border-white/15 text-xs text-slate-300 hover:text-white"
               >
-                {isEn ? 'Back to 3D Explorer' : 'Bumalik sa 3D Explorer'}
+                {tr('Back to 3D Explorer', 'Bumalik sa 3D Explorer')}
               </button>
             </div>
           ) : (
@@ -233,9 +228,9 @@ export function QuoteModal() {
               {/* Progress Indicator */}
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { n: 1, label: isEn ? '1. Service' : '1. Serbisyo' },
-                  { n: 2, label: isEn ? '2. Details' : '2. Detalye' },
-                  { n: 3, label: isEn ? '3. Contact' : '3. Contact' },
+                  { n: 1, label: tr('1. Service', '1. Serbisyo') },
+                  { n: 2, label: tr('2. Details', '2. Detalye') },
+                  { n: 3, label: tr('3. Contact', '3. Contact') },
                 ].map((item) => (
                   <button
                     key={item.n}
@@ -258,7 +253,7 @@ export function QuoteModal() {
               <div className="p-3 rounded-xl bg-slate-900/90 border border-white/12 flex items-start justify-between gap-2">
                 <div className="text-xs min-w-0">
                   <div className="text-[11px] font-semibold text-[#22D3EE]">
-                    {isEn ? 'Your 3D Selection' : 'Napili sa 3D Scene'}
+                    {tr('Your 3D Selection', 'Napili sa 3D Scene')}
                   </div>
                   <div className="text-slate-200 mt-0.5 break-words">
                     {selectionSummary ||
@@ -278,7 +273,7 @@ export function QuoteModal() {
               {step === 1 && (
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <span className="text-xs font-medium text-slate-200">Property Type</span>
+                    <span className="text-xs font-medium text-slate-200">{tr('Property Type')}</span>
                     <div className="grid grid-cols-2 gap-2">
                       {(['residential', 'commercial'] as Audience[]).map((a) => (
                         <button
@@ -298,7 +293,7 @@ export function QuoteModal() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <span className="text-xs font-medium text-slate-200">Service Needed</span>
+                    <span className="text-xs font-medium text-slate-200">{tr('Service Needed')}</span>
                     <div className="grid grid-cols-2 gap-2">
                       {(
                         [
@@ -329,7 +324,7 @@ export function QuoteModal() {
                     onClick={() => setStep(2)}
                     className="w-full py-2.5 rounded-xl bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-bold"
                   >
-                    Continue to Location &amp; Details
+                    {tr('Continue to Location & Details')}
                   </button>
                 </div>
               )}
@@ -338,7 +333,7 @@ export function QuoteModal() {
                 <div className="space-y-3 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <label className="space-y-1">
-                      <span className="text-slate-300">Pampanga City / Town</span>
+                      <span className="text-slate-300">{tr('Pampanga City / Town')}</span>
                       <select
                         value={town}
                         onChange={(e) => setTown(e.target.value)}
@@ -352,7 +347,7 @@ export function QuoteModal() {
                       </select>
                     </label>
                     <label className="space-y-1">
-                      <span className="text-slate-300">Barangay / Subdivision</span>
+                      <span className="text-slate-300">{tr('Barangay / Subdivision')}</span>
                       <input
                         type="text"
                         placeholder="e.g., Brgy. San Matias"
@@ -365,17 +360,17 @@ export function QuoteModal() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <label className="space-y-1">
-                      <span className="text-slate-300">Space Type</span>
+                      <span className="text-slate-300">{tr('Space Type')}</span>
                       <input
                         type="text"
                         value={propertyType}
                         onChange={(e) => setPropertyType(e.target.value)}
-                        placeholder="Bedroom, Office, Storefront..."
+                        placeholder={tr('Bedroom, Office, Storefront...')}
                         className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/15 text-white"
                       />
                     </label>
                     <label className="space-y-1">
-                      <span className="text-slate-300">Approx. Size / Units</span>
+                      <span className="text-slate-300">{tr('Approx. Size / Units')}</span>
                       <input
                         type="text"
                         value={roomSizeOrUnits}
@@ -387,7 +382,7 @@ export function QuoteModal() {
                   </div>
 
                   <label className="block space-y-1">
-                    <span className="text-slate-300">Preferred Visit Schedule</span>
+                    <span className="text-slate-300">{tr('Preferred Visit Schedule')}</span>
                     <select
                       value={preferredSchedule}
                       onChange={(e) => setPreferredSchedule(e.target.value)}
@@ -395,18 +390,18 @@ export function QuoteModal() {
                     >
                       <option value="Weekday Morning">Weekday Morning (8 AM – 12 PM)</option>
                       <option value="Weekday Afternoon">Weekday Afternoon (1 PM – 5 PM)</option>
-                      <option value="Saturday">Saturday</option>
-                      <option value="Urgent / Earliest Slot">Earliest Available Slot</option>
+                      <option value="Saturday">{tr('Saturday')}</option>
+                      <option value="Urgent / Earliest Slot">{tr('Earliest Available Slot')}</option>
                     </select>
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-slate-300">Brief Description / Issue</span>
+                    <span className="text-slate-300">{tr('Brief Description / Issue')}</span>
                     <textarea
                       rows={2}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="AC model, symptoms, or installation notes..."
+                      placeholder={tr('AC model, symptoms, or installation notes...')}
                       className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/15 text-white"
                     />
                   </label>
@@ -424,7 +419,7 @@ export function QuoteModal() {
                       onClick={() => setStep(3)}
                       className="flex-1 py-2.5 rounded-xl bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-bold"
                     >
-                      Continue to Contact Info
+                      {tr('Continue to Contact Info')}
                     </button>
                   </div>
                 </div>
@@ -457,7 +452,7 @@ export function QuoteModal() {
                       />
                     </label>
                     <label className="space-y-1">
-                      <span className="text-slate-300">Email (Optional)</span>
+                      <span className="text-slate-300">{tr('Email (Optional)')}</span>
                       <input
                         type="email"
                         value={email}
@@ -469,7 +464,7 @@ export function QuoteModal() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <span className="text-slate-300">Preferred Contact Channel</span>
+                    <span className="text-slate-300">{tr('Preferred Contact Channel')}</span>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                       {(
                         [
@@ -514,7 +509,7 @@ export function QuoteModal() {
                       type="submit"
                       className="flex-1 py-2.5 rounded-xl bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-bold"
                     >
-                      Prepare Free Quote Request
+                      {tr('Prepare Free Quote Request')}
                     </button>
                   </div>
                 </div>
@@ -524,7 +519,7 @@ export function QuoteModal() {
               <div className="pt-3 border-t border-white/10">
                 <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-300 mb-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#22D3EE]" />
-                  <span>Pampanga Service Coverage</span>
+                  <span>{tr('Pampanga Service Coverage')}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-300">
                   {siteConfig.serviceAreas.slice(0, -1).map((area) => (

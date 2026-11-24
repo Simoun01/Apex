@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 import {
   createBrushedMetalMaps,
   createCopperPatinaMaps,
@@ -541,19 +542,19 @@ export function SplitUnitOutdoor({ position = [2.85, 0.56, -1.65] }: SplitUnitOu
 
           {exploded && (
             <>
-              <Html position={[-0.12, 0.34, 0.58]} center distanceFactor={7}>
-                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-                  Fan Grille
+              <Html position={[-0.12, 0.34, 0.58]} center distanceFactor={4}>
+                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+                  {tr('Fan Grille')}
                 </div>
               </Html>
-              <Html position={[0.45, 0.2, 0]} center distanceFactor={7}>
-                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-                  Compressor
+              <Html position={[0.45, 0.2, 0]} center distanceFactor={4}>
+                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+                  {tr('Compressor')}
                 </div>
               </Html>
-              <Html position={[-0.04, 0.34, -0.38]} center distanceFactor={7}>
-                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-                  Condenser Coil
+              <Html position={[-0.04, 0.34, -0.38]} center distanceFactor={4}>
+                <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+                  {tr('Condenser Coil')}
                 </div>
               </Html>
             </>

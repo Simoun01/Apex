@@ -1,6 +1,7 @@
 import { Building2, ChevronDown, Home } from 'lucide-react';
 import { siteConfig } from '../../config/siteConfig';
 import { useHVACStore } from '../../store/useHVACStore';
+import { tr } from '../../i18n/tr';
 
 let chunksPreloaded = false;
 function preloadStage2Chunks() {
@@ -50,7 +51,7 @@ export function HomeHeroOverlay() {
 
         <div className="relative z-10 max-w-4xl mx-auto space-y-1.5 sm:space-y-2">
           <p className="text-xs sm:text-sm font-semibold tracking-wide text-[#67e8f9]">
-            {language === 'en' ? siteConfig.brand.taglineEn : siteConfig.brand.taglineTaglish}{' '}
+            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)}{' '}
             <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
           </p>
 
@@ -58,15 +59,11 @@ export function HomeHeroOverlay() {
             className="font-display font-extrabold tracking-tight text-white text-balance mx-auto max-w-3xl leading-[1.1]"
             style={{ fontSize: 'clamp(1.75rem, 3.85vw, 3.15rem)' }}
           >
-            {language === 'en'
-              ? 'Aircon Repair, Cleaning & Installation in Pampanga'
-              : 'Aircon Repair, Cleaning & Installation sa Pampanga'}
+            {tr('Aircon Repair, Cleaning & Installation in Pampanga', 'Aircon Repair, Cleaning & Installation sa Pampanga')}
           </h2>
 
           <p className="text-xs sm:text-sm md:text-[15px] text-slate-100 max-w-[45rem] mx-auto leading-relaxed font-normal">
-            {language === 'en'
-              ? 'Explore a Filipino home split-type setup or a two-storey commercial HVAC building in real-time 3D before booking your free Pampanga site assessment.'
-              : 'Silipin ang 3D residential split-type aircon o commercial HVAC building bago magpa-book ng libreng site assessment sa Pampanga.'}
+            {tr('Explore a Filipino home split-type setup or a two-storey commercial HVAC building in real-time 3D before booking your free Pampanga site assessment.', 'Silipin ang 3D residential split-type aircon o commercial HVAC building bago magpa-book ng libreng site assessment sa Pampanga.')}
           </p>
         </div>
       </div>
@@ -123,9 +120,7 @@ export function HomeHeroOverlay() {
           </div>
 
           <p className="text-[11px] sm:text-xs text-slate-300 text-center">
-            {language === 'en'
-              ? 'Drag street scene to orbit · Scroll page down for details · Ctrl/Pinch to zoom'
-              : 'I-drag ang 3D street para umikot · Mag-scroll pababa para sa detalye · Ctrl/Pinch para mag-zoom'}
+            {tr('Drag street scene to orbit · Scroll page down for details · Ctrl/Pinch to zoom', 'I-drag ang 3D street para umikot · Mag-scroll pababa para sa detalye · Ctrl/Pinch para mag-zoom')}
           </p>
 
           {/* Visible Scroll-Down Affordance */}
@@ -135,7 +130,7 @@ export function HomeHeroOverlay() {
             className="pointer-events-auto group inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-[#67e8f9] hover:text-white transition-colors"
           >
             <span>
-              {language === 'en' ? 'See services & service areas' : 'Tingnan ang mga serbisyo at lugar'}
+              {tr('See services & service areas', 'Tingnan ang mga serbisyo at lugar')}
             </span>
             <ChevronDown
               className="w-4 h-4 animate-bounce text-[#22D3EE] group-hover:text-white"

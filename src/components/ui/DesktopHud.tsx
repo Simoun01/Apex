@@ -20,6 +20,7 @@ import { siteConfig } from '../../config/siteConfig';
 import { CameraPreset, ServiceMode } from '../../data/hvacData';
 import { FanSpeed, useHVACStore } from '../../store/useHVACStore';
 import { ServiceContextPanel } from './ServiceContextPanel';
+import { tr } from '../../i18n/tr';
 
 const SERVICE_ITEMS: {
   id: ServiceMode;
@@ -79,7 +80,7 @@ export function DesktopHud() {
           className="pointer-events-auto absolute left-4 top-4 w-52 p-2 rounded-2xl bg-[#0B1F3A]/88 border border-white/12 shadow-xl space-y-1"
         >
           <div className="px-2.5 py-1 text-[11px] font-medium text-slate-300">
-            {isEn ? 'Explore Services' : 'Piliin ang Serbisyo'}
+            {tr('Explore Services', 'Piliin ang Serbisyo')}
           </div>
           {SERVICE_ITEMS.map(({ id, num, en, taglish, Icon }) => {
             const active = service === id;
@@ -101,7 +102,7 @@ export function DesktopHud() {
               >
                 <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">
-                  {num}. {isEn ? en : taglish}
+                  {num}. {tr(en, taglish)}
                 </span>
               </button>
             );
@@ -117,7 +118,7 @@ export function DesktopHud() {
         >
           <div className="flex items-center justify-between">
             <h3 className="font-display text-sm font-bold text-white">
-              {isEn ? 'Why Apex Mechanical' : 'Bakit Apex Mechanical?'}
+              {tr('Why Apex Mechanical', 'Bakit Apex Mechanical?')}
             </h3>
             <button
               type="button"
@@ -132,10 +133,10 @@ export function DesktopHud() {
             {siteConfig.trustPoints.map((tp) => (
               <li key={tp.id} className="text-xs">
                 <div className="font-semibold text-[#22D3EE]">
-                  {isEn ? tp.en : tp.taglish}
+                  {tr(tp.en, tp.taglish)}
                 </div>
                 <div className="text-slate-300 text-[11px]">
-                  {isEn ? tp.detailEn : tp.detailTaglish}
+                  {tr(tp.detailEn, tp.detailTaglish)}
                 </div>
               </li>
             ))}
@@ -143,7 +144,7 @@ export function DesktopHud() {
           <div className="pt-2 border-t border-white/10">
             <div className="flex items-center gap-1 text-[11px] font-semibold text-white mb-1.5">
               <MapPin className="w-3.5 h-3.5 text-[#F97316]" />
-              <span>{isEn ? 'Pampanga Service Areas' : 'Lugar na Sineserbisyuhan'}</span>
+              <span>{tr('Pampanga Service Areas', 'Lugar na Sineserbisyuhan')}</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
               {siteConfig.serviceAreas.join(' · ')}
@@ -166,13 +167,13 @@ export function DesktopHud() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0B1F3A]/92 border border-white/15 text-xs font-semibold text-white shadow-xl hover:border-[#22D3EE]/50"
             >
               <ChevronRight className="w-4 h-4 rotate-180 text-[#22D3EE]" />
-              <span>{isEn ? 'Details' : 'Detalye'}</span>
+              <span>{tr('Details', 'Detalye')}</span>
             </button>
           ) : (
             <div className="w-[328px] max-h-full flex flex-col rounded-2xl bg-[#0B1F3A]/90 border border-white/12 shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
                 <span className="text-xs font-semibold text-slate-200">
-                  {isEn ? 'Interactive Inspector' : 'Interactive Inspector'}
+                  {tr('Interactive Inspector', 'Interactive Inspector')}
                 </span>
                 <button
                   type="button"
@@ -203,12 +204,12 @@ export function DesktopHud() {
           {hudCollapsed ? (
             <>
               <ChevronUp className="w-3.5 h-3.5 text-[#22D3EE]" />
-              <span>Show Controls</span>
+              <span>{tr('Show Controls')}</span>
             </>
           ) : (
             <>
               <ChevronDown className="w-3.5 h-3.5 text-[#22D3EE]" />
-              <span>Hide Controls</span>
+              <span>{tr('Hide Controls')}</span>
             </>
           )}
         </button>
@@ -249,7 +250,7 @@ export function DesktopHud() {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Exploded</span>
+              <span>{tr('Exploded')}</span>
             </button>
 
             <button
@@ -265,7 +266,7 @@ export function DesktopHud() {
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>X-Ray</span>
+              <span>{tr('X-Ray')}</span>
             </button>
 
             <div className="flex items-center gap-1">
@@ -282,7 +283,7 @@ export function DesktopHud() {
                 }`}
               >
                 <Wind className="w-3.5 h-3.5" />
-                <span>Airflow</span>
+                <span>{tr('Airflow')}</span>
               </button>
               {airflowOn && (
                 <div className="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-white/10" role="group" aria-label="Fan speed">
@@ -319,7 +320,7 @@ export function DesktopHud() {
               }`}
             >
               <Flame className="w-3.5 h-3.5" />
-              <span>Heat Map</span>
+              <span>{tr('Heat Map')}</span>
             </button>
 
             <button
@@ -346,7 +347,7 @@ export function DesktopHud() {
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-200 hover:bg-white/8 transition-colors whitespace-nowrap border-l border-white/12 pl-3"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset View</span>
+              <span>{tr('Reset View')}</span>
             </button>
           </div>
         )}

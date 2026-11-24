@@ -1,6 +1,7 @@
 import { Html } from '@react-three/drei';
 import { getEquipmentById, useHVACStore } from '../../store/useHVACStore';
 import { SplitUnitIndoor } from './SplitUnitIndoor';
+import { tr } from '../../i18n/tr';
 
 function WindowACModel({ position, label }: { position: [number, number, number]; label?: string }) {
   const powerOn = useHVACStore((s) => s.powerOn);
@@ -37,8 +38,8 @@ function WindowACModel({ position, label }: { position: [number, number, number]
         />
       </mesh>
       {label && (
-        <Html position={[0, 0.38, 0]} center distanceFactor={7}>
-          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[11px] font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
+        <Html position={[0, 0.38, 0]} center distanceFactor={4}>
+          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[10px] leading-tight font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
             {label}
           </div>
         </Html>
@@ -83,8 +84,8 @@ function FloorMountedModel({ position, label }: { position: [number, number, num
         />
       </mesh>
       {label && (
-        <Html position={[0, 1.92, 0]} center distanceFactor={7}>
-          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[11px] font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
+        <Html position={[0, 1.92, 0]} center distanceFactor={4}>
+          <div className="px-2 py-0.5 rounded bg-[#0B1F3A]/95 border border-[#22D3EE]/50 text-[10px] leading-tight font-semibold text-[#22D3EE] whitespace-nowrap pointer-events-none">
             {label}
           </div>
         </Html>
@@ -115,7 +116,7 @@ export function ResidentialEquipmentVariants() {
         {compareEquipmentIds.map((id, index) => {
           const item = getEquipmentById(id);
           const x = offsets[index] ?? 0;
-          const lbl = language === 'en' ? item.nameEn : item.nameTaglish;
+          const lbl = tr(item.nameEn, item.nameTaglish);
 
           if (item.modelType === 'window_inverter') {
             return <WindowACModel key={id} position={[x, 1.85, -2.02]} label={lbl} />;

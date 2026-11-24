@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { HVAC_PARTS } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { getPartHighlightState } from './hvacSceneUtils';
+import { tr } from '../../i18n/tr';
 
 const _emissiveCyan = new THREE.Color('#22D3EE');
 const _emissiveOrange = new THREE.Color('#F97316');
@@ -357,9 +358,9 @@ export function DuctedAHU() {
             </mesh>
           </group>
           {exploded && (
-            <Html position={[0, -0.5, 0]} center distanceFactor={7}>
-              <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[10px] font-medium text-slate-200 whitespace-nowrap pointer-events-none">
-                4-Way Cassette Fascia
+            <Html position={[0, -0.5, 0]} center distanceFactor={4}>
+              <div className="px-1.5 py-0.5 rounded bg-[#0B1F3A]/90 border border-white/15 text-[9px] leading-tight font-medium text-slate-200 whitespace-nowrap pointer-events-none">
+                {tr('4-Way Cassette Fascia')}
               </div>
             </Html>
           )}

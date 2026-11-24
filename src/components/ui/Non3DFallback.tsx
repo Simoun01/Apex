@@ -3,6 +3,7 @@ import { siteConfig } from '../../config/siteConfig';
 import { ServiceMode } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { ServiceContextPanel } from './ServiceContextPanel';
+import { tr } from '../../i18n/tr';
 
 export function Non3DFallback() {
   const service = useHVACStore((s) => s.service);
@@ -19,12 +20,10 @@ export function Non3DFallback() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/90 border border-white/12">
           <div>
             <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
-              {siteConfig.brand.name} — {isEn ? 'Accessible Service Directory' : 'Direktoryo ng Serbisyo'}
+              {siteConfig.brand.name} — {tr('Accessible Service Directory', 'Direktoryo ng Serbisyo')}
             </h2>
             <p className="text-sm text-slate-300 mt-1">
-              {isEn
-                ? 'Explore all four aircon services, calculate recommended HP, and request a free site assessment in Pampanga.'
-                : 'Tingnan ang apat na serbisyo ng aircon, mag-compute ng tamang HP, at mag-request ng libreng site assessment sa Pampanga.'}
+              {tr('Explore all four aircon services, calculate recommended HP, and request a free site assessment in Pampanga.', 'Tingnan ang apat na serbisyo ng aircon, mag-compute ng tamang HP, at mag-request ng libreng site assessment sa Pampanga.')}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -33,14 +32,14 @@ export function Non3DFallback() {
               onClick={() => setNon3dMode(false)}
               className="px-3.5 py-2 rounded-lg bg-slate-800 border border-white/15 text-xs font-semibold text-[#22D3EE] hover:bg-slate-700"
             >
-              {isEn ? 'Try 3D View' : 'Buksan ang 3D View'}
+              {tr('Try 3D View', 'Buksan ang 3D View')}
             </button>
             <button
               type="button"
               onClick={() => setQuoteModalOpen(true)}
               className="px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs font-bold"
             >
-              {isEn ? 'Get a Free Quote' : 'Libreng Quote'}
+              {tr('Get a Free Quote', 'Libreng Quote')}
             </button>
           </div>
         </div>
@@ -79,16 +78,16 @@ export function Non3DFallback() {
             <div className="p-5 rounded-2xl bg-slate-900/75 border border-white/12 space-y-3">
               <div className="flex items-center gap-2 font-display text-sm font-bold text-white">
                 <ShieldCheck className="w-4 h-4 text-[#22D3EE]" />
-                <span>{isEn ? 'Why Apex Mechanical' : 'Bakit Apex Mechanical?'}</span>
+                <span>{tr('Why Apex Mechanical', 'Bakit Apex Mechanical?')}</span>
               </div>
               <ul className="space-y-2.5 text-xs">
                 {siteConfig.trustPoints.map((tp) => (
                   <li key={tp.id}>
                     <div className="font-semibold text-[#22D3EE]">
-                      {isEn ? tp.en : tp.taglish}
+                      {tr(tp.en, tp.taglish)}
                     </div>
                     <div className="text-slate-300">
-                      {isEn ? tp.detailEn : tp.detailTaglish}
+                      {tr(tp.detailEn, tp.detailTaglish)}
                     </div>
                   </li>
                 ))}
@@ -98,7 +97,7 @@ export function Non3DFallback() {
             <div className="p-5 rounded-2xl bg-slate-900/75 border border-white/12 space-y-2.5 text-xs">
               <div className="flex items-center gap-2 font-display text-sm font-bold text-white">
                 <MapPin className="w-4 h-4 text-[#F97316]" />
-                <span>Pampanga Service Areas</span>
+                <span>{tr('Pampanga Service Areas')}</span>
               </div>
               <p className="text-slate-300 leading-relaxed">
                 {siteConfig.serviceAreas.join(' · ')}

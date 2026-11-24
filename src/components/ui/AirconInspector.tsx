@@ -12,6 +12,7 @@ import { EQUIPMENT_CATALOG } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { ExplodeProvider, MODELS, StudioEnvironment } from '../scene/airconModels';
 import type { ExplodeRef, Motion, MotionRef, V3 } from '../scene/airconModels';
+import { tr } from '../../i18n/tr';
 
 /* ============================================================================
    3D aircon inspector.
@@ -221,7 +222,7 @@ function Stage({ kind, brand, motionRef, explodeRef, exploded, en, parts, picked
   const lift = kind === 'wall' ? 0.25 : 0;
   return (
     <group scale={s} position={[exploded ? 0 : kind === 'wall' ? -0.5 : kind === 'floor' ? -0.35 : 0, exploded ? 0 : lift, 0]}>
-      <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en}>
+      <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en} spread={1.5}>
         <Model brand={brand} motionRef={motionRef} companion={!exploded} />
       </ExplodeProvider>
       {!exploded && <Airflow kind={kind} motionRef={motionRef} />}
@@ -305,23 +306,23 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const from = { x: target.origin.x - vw / 2, y: target.origin.y - vh / 2 };
 
-  const name = en ? item?.nameEn : item?.nameTaglish;
+  const name = tr(item?.nameEn, item?.nameTaglish);
   const fmt = (n: number) => n.toLocaleString('en-US');
 
   const stats = [
-    { icon: <Zap className="w-3.5 h-3.5" />, label: en ? 'Cooling capacity' : 'Lakas ng lamig', value: `${fmt(spec.btu)} BTU/h`, sub: `${spec.kw} kW` },
-    { icon: <Wind className="w-3.5 h-3.5" />, label: en ? 'Airflow (now)' : 'Hangin (ngayon)', value: `${fmt(airNow)} m³/h`, sub: `${en ? 'max' : 'max'} ${fmt(spec.airflow)}` },
-    { icon: <Gauge className="w-3.5 h-3.5" />, label: en ? 'Fan speed (now)' : 'Bilis ng fan', value: `${fmt(rpmNow)} rpm`, sub: `${en ? 'step' : 'level'} ${lvl}/${steps}` },
-    { icon: <Gauge className="w-3.5 h-3.5" />, label: en ? 'Sound level' : 'Ingay', value: `${noiseNow} dBA`, sub: `${spec.noiseLow}–${spec.noiseHigh} dBA` },
+    { icon: <Zap className="w-3.5 h-3.5" />, label: tr('Cooling capacity', 'Lakas ng lamig'), value: `${fmt(spec.btu)} BTU/h`, sub: `${spec.kw} kW` },
+    { icon: <Wind className="w-3.5 h-3.5" />, label: tr('Airflow (now)', 'Hangin (ngayon)'), value: `${fmt(airNow)} m³/h`, sub: `${tr('max', 'max')} ${fmt(spec.airflow)}` },
+    { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Fan speed (now)', 'Bilis ng fan'), value: `${fmt(rpmNow)} rpm`, sub: `${tr('step', 'level')} ${lvl}/${steps}` },
+    { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Sound level', 'Ingay'), value: `${noiseNow} dBA`, sub: `${spec.noiseLow}–${spec.noiseHigh} dBA` },
   ];
   const rows: [string, string][] = [
     [spec.effUnit === 'CSPF' ? 'CSPF' : 'EER', `${spec.eff.toFixed(2)}${spec.effUnit === 'EER' ? ' W/W' : ''}`],
-    [en ? 'Compressor' : 'Compressor', spec.compressor],
-    [en ? 'Refrigerant' : 'Refrigerant', spec.refrigerant],
-    [en ? 'Inverter' : 'Inverter', spec.inverter ? (en ? 'Yes' : 'Oo') : en ? 'No (fixed speed)' : 'Hindi (fixed speed)'],
-    ...(spec.throwM ? ([[en ? 'Air throw' : 'Abot ng hangin', `up to ${spec.throwM} m`]] as [string, string][]) : []),
-    [en ? 'Warranty' : 'Warranty', spec.warranty],
-    [en ? 'Indicative price' : 'Tinatayang presyo', item?.priceEstimatePhp ?? '—'],
+    [tr('Compressor', 'Compressor'), spec.compressor],
+    [tr('Refrigerant', 'Refrigerant'), spec.refrigerant],
+    [tr('Inverter', 'Inverter'), spec.inverter ? (tr('Yes', 'Oo')) : tr('No (fixed speed)', 'Hindi (fixed speed)')],
+    ...(spec.throwM ? ([[tr('Air throw', 'Abot ng hangin'), `up to ${spec.throwM} m`]] as [string, string][]) : []),
+    [tr('Warranty', 'Warranty'), spec.warranty],
+    [tr('Indicative price', 'Tinatayang presyo'), item?.priceEstimatePhp ?? '—'],
   ];
 
   return createPortal(
@@ -364,7 +365,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                   parts={features.map((f) => f.part)}
                   picked={picked}
                   onPick={setPicked}
-                  labelOf={(i) => (en ? features[i].nameEn : features[i].nameTl)}
+                  labelOf={(i) => tr(features[i].nameEn, features[i].nameTl)}
                 />
               </group>
               <SpeedEaser motionRef={motionRef} />
@@ -380,7 +381,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
               />
             </Canvas>
             <div className="ai-stage-bar">
-              <span>{en ? 'Drag to turn · scroll to zoom' : 'I-drag para iikot · scroll para mag-zoom'}</span>
+              <span>{tr('Drag to turn · scroll to zoom', 'I-drag para iikot · scroll para mag-zoom')}</span>
               <button
                 type="button"
                 className={`ai-explode-btn${exploded ? ' is-on' : ''}`}
@@ -388,9 +389,9 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                 aria-pressed={exploded}
               >
                 <Boxes className="w-4 h-4" aria-hidden="true" />
-                {exploded ? (en ? 'Assemble' : 'Ibalik') : en ? 'Exploded view' : 'Exploded view'}
+                {exploded ? (tr('Assemble', 'Ibalik')) : tr('Exploded view', 'Exploded view')}
               </button>
-              <button type="button" className="ai-icon-btn" onClick={() => setSpinKey((n) => n + 1)} aria-label={en ? 'Reset view' : 'I-reset ang view'}>
+              <button type="button" className="ai-icon-btn" onClick={() => setSpinKey((n) => n + 1)} aria-label={tr('Reset view', 'I-reset ang view')}>
                 <RotateCcw className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
@@ -398,17 +399,17 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
 
           {/* ── Data ── */}
           <div className="ai-panel">
-            <button ref={closeBtn} type="button" className="ai-close" onClick={onClose} aria-label={en ? 'Close' : 'Isara'}>
+            <button ref={closeBtn} type="button" className="ai-close" onClick={onClose} aria-label={tr('Close', 'Isara')}>
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
             <p className="ai-eyebrow">
-              {en ? k.labelEn : k.labelTl} · {target.variant}
+              {tr(k.labelEn, k.labelTl)} · {target.variant}
             </p>
             <h2 id="ai-title" className="ai-title">
               {brand.name} <span>{name}</span>
             </h2>
 
-            <div className="ai-brands" role="tablist" aria-label={en ? 'Brand' : 'Brand'}>
+            <div className="ai-brands" role="tablist" aria-label={tr('Brand', 'Brand')}>
               {BRANDS.map((b) => (
                 <button
                   key={b.id}
@@ -442,17 +443,17 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
 
             <div className="ai-speed">
               <div className="ai-speed-h">
-                <span>{en ? 'Fan speed' : 'Bilis ng fan'}</span>
-                <span>{lvl === steps ? (en ? 'Turbo' : 'Turbo') : lvl === 1 ? (en ? 'Quiet' : 'Tahimik') : `${en ? 'Step' : 'Level'} ${lvl}`}</span>
+                <span>{tr('Fan speed', 'Bilis ng fan')}</span>
+                <span>{lvl === steps ? (tr('Turbo', 'Turbo')) : lvl === 1 ? (tr('Quiet', 'Tahimik')) : `${tr('Step', 'Level')} ${lvl}`}</span>
               </div>
-              <div className="ai-steps" role="radiogroup" aria-label={en ? 'Fan speed' : 'Bilis ng fan'}>
+              <div className="ai-steps" role="radiogroup" aria-label={tr('Fan speed', 'Bilis ng fan')}>
                 {Array.from({ length: steps }, (_, i) => (
                   <button
                     key={i}
                     type="button"
                     role="radio"
                     aria-checked={lvl === i + 1}
-                    aria-label={`${en ? 'Step' : 'Level'} ${i + 1}`}
+                    aria-label={`${tr('Step', 'Level')} ${i + 1}`}
                     className={`ai-step${i < lvl ? ' is-on' : ''}`}
                     style={{ height: `${10 + (i / Math.max(steps - 1, 1)) * 18}px` }}
                     onClick={() => setLevel(i + 1)}
@@ -461,18 +462,18 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
               </div>
             </div>
 
-            <h3 className="ai-h3">{en ? 'What makes it different' : 'Ano ang kakaiba'}</h3>
+            <h3 className="ai-h3">{tr('What makes it different', 'Ano ang kakaiba')}</h3>
             <ol className="ai-parts">
               {features.map((f, i) => (
                 <li key={`${brandId}${i}`}>
                   <button type="button" className={`ai-part${picked === i ? ' is-on' : ''}`} onClick={() => setPicked(picked === i ? null : i)} aria-pressed={picked === i}>
                     <span className="ai-part-n">{i + 1}</span>
                     <span>
-                      <strong>{en ? f.nameEn : f.nameTl}</strong>
+                      <strong>{tr(f.nameEn, f.nameTl)}</strong>
                       <AnimatePresence initial={false}>
                         {picked === i && (
                           <motion.span className="ai-part-t" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
-                            {en ? f.textEn : f.textTl}
+                            {tr(f.textEn, f.textTl)}
                           </motion.span>
                         )}
                       </AnimatePresence>
@@ -491,9 +492,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
               ))}
             </dl>
             <p className="ai-note">
-              {en
-                ? `Typical ${brand.name} figures for this size, for comparison. Exact ratings depend on the model; we confirm them on the data sheet with your quote.`
-                : `Karaniwang figures ng ${brand.name} sa ganitong laki, pang-kumpara. Nakadepende sa model ang eksaktong rating; kinukumpirma namin sa data sheet kasama ng quote.`}
+              {tr(`Typical ${brand.name} figures for this size, for comparison. Exact ratings depend on the model; we confirm them on the data sheet with your quote.`, `Karaniwang figures ng ${brand.name} sa ganitong laki, pang-kumpara. Nakadepende sa model ang eksaktong rating; kinukumpirma namin sa data sheet kasama ng quote.`, `以上为 ${brand.name} 该匹数的典型参数，仅供比较。实际数值以具体型号为准，我们会随报价提供规格书确认。`)}
             </p>
 
             <button
@@ -505,7 +504,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
               }}
             >
               <CalendarCheck className="w-4 h-4" aria-hidden="true" />
-              {en ? `Get a quote for this ${brand.id === 'mitsubishi' ? 'Mitsubishi' : brand.name}` : `Magpa-quote ng ${brand.id === 'mitsubishi' ? 'Mitsubishi' : brand.name}`}
+              {tr(`Get a quote for this ${brand.id === 'mitsubishi' ? 'Mitsubishi' : brand.name}`, `Magpa-quote ng ${brand.id === 'mitsubishi' ? 'Mitsubishi' : brand.name}`, `获取这款 ${brand.id === 'mitsubishi' ? 'Mitsubishi' : brand.name} 的报价`)}
             </button>
           </div>
         </motion.div>
