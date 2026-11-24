@@ -1,9 +1,14 @@
-import { CalendarCheck, ChevronDown, Settings2, X } from 'lucide-react';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Box as BoxIcon, CalendarCheck, ChevronDown, Settings2, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { Suspense, createContext, lazy, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { siteConfig } from '../../config/siteConfig';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
+import type { InspectTarget } from './AirconInspector';
+
+// three.js only loads when a visitor opens a unit in 3D.
+const AirconInspector = lazy(() => import('./AirconInspector'));
 
 /* ============================================================================
    Projection
@@ -149,6 +154,7 @@ interface HotMeta {
 interface HotCtx {
   active: HotMeta | null;
   open: (m: HotMeta) => void;
+  inspect: (m: HotMeta) => void;
   scheduleClose: () => void;
   cancelClose: () => void;
 }
@@ -162,7 +168,7 @@ function Hot({ meta, children }: { meta: HotMeta; children: ReactNode }) {
   const onKey = (e: KeyboardEvent<SVGGElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      ctx.open(meta);
+      ctx.inspect(meta);
     }
   };
   return (
@@ -171,13 +177,13 @@ function Hot({ meta, children }: { meta: HotMeta; children: ReactNode }) {
       data-accent={item?.audience === 'commercial' ? 'amber' : 'cyan'}
       tabIndex={0}
       role="button"
-      aria-label={`${meta.variant}: ${item?.nameEn ?? ''}. Show details`}
+      aria-label={`${meta.variant}: ${item?.nameEn ?? ''}. Open in 3D`}
       aria-expanded={isActive}
       onMouseEnter={() => ctx.open(meta)}
       onMouseLeave={ctx.scheduleClose}
       onFocus={() => ctx.open(meta)}
       onBlur={ctx.scheduleClose}
-      onClick={() => ctx.open(meta)}
+      onClick={() => ctx.inspect(meta)}
       onKeyDown={onKey}
     >
       {children}
@@ -188,8 +194,6 @@ function Hot({ meta, children }: { meta: HotMeta; children: ReactNode }) {
 function ProductPopover({ meta, onClose }: { meta: HotMeta; onClose: () => void }) {
   const ctx = useContext(HotContext)!;
   const language = useHVACStore((s) => s.language);
-  const enterExperience = useHVACStore((s) => s.enterExperience);
-  const setSelectedEquipmentId = useHVACStore((s) => s.setSelectedEquipmentId);
   const setQuoteModalOpen = useHVACStore((s) => s.setQuoteModalOpen);
   const item = EQUIPMENT_CATALOG.find((e) => e.id === meta.catalogId);
   if (!item) return null;
@@ -218,6 +222,7 @@ function ProductPopover({ meta, onClose }: { meta: HotMeta; onClose: () => void 
       <h3 className="mt-1 pr-6 font-display text-[15px] font-bold leading-snug text-white">
         {en ? item.nameEn : item.nameTaglish}
       </h3>
+      <p className="mt-1 text-[11px] text-slate-400">{en ? 'Click the unit to see it in 3D with brand specs' : 'I-click ang unit para makita sa 3D kasama ang specs'}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <span className="sr-chip">{item.capacityRange.split(' (')[0]}</span>
         {item.inverter && <span className="sr-chip sr-chip--ok">Inverter</span>}
@@ -238,15 +243,9 @@ function ProductPopover({ meta, onClose }: { meta: HotMeta; onClose: () => void 
         </div>
       </dl>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className="sr-btn sr-btn--ghost"
-          onClick={() => {
-            enterExperience(item.audience, { service: 'equipment' });
-            setSelectedEquipmentId(item.id);
-          }}
-        >
-          {en ? 'View in 3D' : 'Tingnan sa 3D'}
+        <button type="button" className="sr-btn sr-btn--ghost" onClick={() => ctx.inspect(meta)}>
+          <BoxIcon className="w-3.5 h-3.5" aria-hidden="true" />
+          {en ? 'Inspect in 3D' : 'Silipin sa 3D'}
         </button>
         <button type="button" className="sr-btn sr-btn--solid" onClick={() => setQuoteModalOpen(true)}>
           {en ? 'Get a quote' : 'Magpa-quote'}
@@ -270,7 +269,12 @@ function WallSplit({ x, y, z, d, h, body, style }: { x: number; y: number; z: nu
       {style === 'slim' && <rect x={0} y={h * 0.42} width={d} height={3} fill="#94a3b8" />}
       {style === 'standard' && <rect x={0} y={h * 0.5} width={d} height={4} fill="#64748b" />}
       <rect x={5} y={h - 10} width={d - 10} height={6} rx={3} fill={dark ? '#000000' : '#1f2937'} />
-      <rect x={7} y={h - 8.8} width={d - 14} height={1.6} rx={0.8} fill={dark ? '#334155' : '#64748b'} />
+      <g className="sr-louver">
+        <rect x={7} y={h - 8.8} width={d - 14} height={1.6} rx={0.8} fill={dark ? '#334155' : '#94a3b8'} />
+      </g>
+      {[0.25, 0.5, 0.75].map((t, i) => (
+        <path key={t} d={`M${d * t} ${h - 3} q-3 6 0 12 q3 6 0 12`} stroke="#bae6fd" strokeWidth={1.1} fill="none" strokeLinecap="round" className="sr-cool" style={{ animationDelay: `${i * 0.5}s` }} />
+      ))}
       <rect x={d - 30} y={h * 0.28} width={18} height={8} rx={1.5} fill="#0b1f3a" />
       <text x={d - 21} y={h * 0.28 + 6.2} textAnchor="middle" fontSize={6} fontWeight={700} fill={style === 'standard' ? '#4ade80' : '#22d3ee'} fontFamily="ui-monospace,monospace">
         {style === 'standard' ? 'ON' : '24°'}
@@ -328,6 +332,9 @@ function FloorTower() {
             <Slats x={9} y={50} w={34} h={56} gap={5.5} color="#64748b" vertical sw={2} />
           </g>
           <Slats x={8} y={118} w={36} h={44} gap={4} color="#cbd5e1" />
+          {[14, 26, 38].map((cx, i) => (
+            <path key={cx} d={`M${cx} 78 q5 -3 10 0 q5 3 10 0`} stroke="#bae6fd" strokeWidth={1.2} fill="none" strokeLinecap="round" className="sr-cool sr-cool--side" style={{ animationDelay: `${i * 0.45}s` }} />
+          ))}
         </g>
       }
     />
@@ -362,6 +369,7 @@ function WindowUnit({ x, y, z, body = '#f4f6f9', grille = 'h', display = false, 
       <circle cx={w - 11.5} cy={h * 0.5} r={3.6} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.7} />
       <line x1={w - 11.5} y1={h * 0.5} x2={w - 11.5} y2={h * 0.5 - 3} stroke="#334155" strokeWidth={1} />
       <text x={w - 11.5} y={h - 8} textAnchor="middle" fontSize={3.6} fontWeight={800} fill="#94a3b8">APEX</text>
+      {display && <circle cx={w - 6} cy={h - 6} r={1} fill="#22c55e" className="sr-blink" />}
     </g>
   );
   const right = <Slats x={5} y={6} w={d - 10} h={h - 12} gap={3.2} color={shade(body, -0.3)} vertical sw={0.9} />;
@@ -489,6 +497,59 @@ function Cylinder({ x, y, h, r, grad, valve = '#334155' }: { x: number; y: numbe
       <rect x={-r * 0.35} y={-h - 6} width={r * 0.7} height={8} rx={1.5} fill={valve} />
       <rect x={-r * 0.6} y={-h - 9} width={r * 1.2} height={3} rx={1.5} fill="#64748b" />
       <rect x={-r} y={-h * 0.45} width={r * 2} height={6} fill="#ffffff" opacity={0.22} />
+    </g>
+  );
+}
+
+/** Clipboard with a checklist; the ticks fill in one by one. */
+function Clipboard() {
+  return (
+    <g transform="translate(-4 20) rotate(-8)">
+      <rect x={-9} y={-12} width={18} height={24} rx={1.6} fill="#a16207" />
+      <rect x={-7.5} y={-9.5} width={15} height={20} rx={0.8} fill="#f8fafc" />
+      <rect x={-3.5} y={-13.5} width={7} height={3.6} rx={1} fill="#64748b" />
+      {[0, 1, 2, 3].map((i) => (
+        <g key={i}>
+          <rect x={-5.5} y={-6.5 + i * 4.4} width={2.4} height={2.4} rx={0.4} fill="none" stroke="#94a3b8" strokeWidth={0.5} />
+          <path d={`M-5.2 ${-5.4 + i * 4.4} l0.8 0.9 l1.6 -1.9`} stroke="#16a34a" strokeWidth={0.8} fill="none" className="sr-tick" style={{ animationDelay: `${i * 0.9}s` }} />
+          <rect x={-1.6} y={-6 + i * 4.4} width={i % 2 ? 6 : 7.5} height={1.2} rx={0.6} fill="#cbd5e1" />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+/** Hand-pallet truck with a boxed unit, pushed by its handle (local x grows forward). */
+function PalletJack() {
+  return (
+    <g>
+      <ellipse cx={-34} cy={2} rx={30} ry={5} fill="#020617" opacity={0.35} filter="url(#sr-soft)" />
+      {/* forks + wheels */}
+      <rect x={-62} y={-6} width={50} height={4} rx={1} fill="#f59e0b" />
+      <rect x={-14} y={-14} width={7} height={12} rx={1.5} fill="#f59e0b" />
+      <circle cx={-58} cy={0} r={2.6} fill="#111827" />
+      <circle cx={-12} cy={0} r={3.4} fill="#111827" />
+      <circle cx={-12} cy={0} r={1.2} fill="#9ca3af" />
+      {/* handle up to the worker's hands */}
+      <path d="M-10 -12 L4 -44" stroke="#f59e0b" strokeWidth={2.6} strokeLinecap="round" />
+      <path d="M0 -46 h9" stroke="#111827" strokeWidth={3} strokeLinecap="round" />
+      {/* pallet + boxed condenser, rocking slightly as it rolls */}
+      <g className="sr-cargo">
+        <rect x={-62} y={-12} width={50} height={6} fill="#a8743f" />
+        <rect x={-58} y={-11} width={8} height={4} fill="#3f2a17" />
+        <rect x={-24} y={-11} width={8} height={4} fill="#3f2a17" />
+        <rect x={-60} y={-48} width={46} height={36} rx={1.5} fill="#c8955c" />
+        <rect x={-60} y={-48} width={46} height={6} fill="#e0b47f" />
+        <rect x={-39} y={-48} width={4} height={36} fill="#e0b47f" opacity={0.8} />
+        <text x={-56} y={-26} fontSize={6.5} fontWeight={800} fill="#7c4f22" letterSpacing={0.8}>APEX</text>
+        <text x={-56} y={-18} fontSize={4} fontWeight={700} fill="#7c4f22">OUTDOOR 1.5HP</text>
+        <rect x={-30} y={-28} width={12} height={8} fill="#f8fafc" />
+        <g stroke="#111827" strokeWidth={0.5}>
+          {[0, 1.5, 2.5, 4, 5, 7, 8.5, 9.5].map((x) => (
+            <line key={x} x1={-29 + x} y1={-27} x2={-29 + x} y2={-22} />
+          ))}
+        </g>
+      </g>
     </g>
   );
 }
@@ -1038,6 +1099,46 @@ function ShowroomScene() {
         <WindowUnit x={705} y={258} z={10} w={80} d={64} h={58} body="#e7ebf0" grille="mesh" display />
       </Hot>
 
+      {/* Logistics: pushing a boxed outdoor unit on a pallet jack, out and back */}
+      <g className="sr-jack-path">
+        <g className="sr-walk-flip sr-jack-flip">
+          <g transform="translate(26 0)">
+            <PalletJack />
+          </g>
+          <Technician
+            x={0}
+            y={0}
+            armLeft={-62}
+            armRight={-62}
+            bodyClass="sr-walk-bob sr-lean"
+            legClass={['sr-leg-a sr-leg--slow', 'sr-leg-b sr-leg--slow']}
+            headClass="sr-head-look"
+          />
+        </g>
+      </g>
+
+      {/* Dispatch bay: boxed stock waiting to ship, with a logistics checker */}
+      <Pallet x={705} y={392} w={70} d={66} />
+      <Block x={710} y={398} z={10} w={58} d={54} h={44} color="#c8955c"
+        top={<rect x={0} y={22} width={58} height={8} fill="#e0b47f" opacity={0.85} />}
+        left={<g><text x={5} y={18} fontSize={7} fontWeight={800} fill="#7c4f22" letterSpacing={1}>APEX</text><rect x={34} y={24} width={18} height={12} fill="#f8fafc" /><rect x={36} y={27} width={14} height={1.2} fill="#111827" /><rect x={36} y={30} width={10} height={1.2} fill="#111827" /></g>}
+      />
+      <Block x={716} y={404} z={54} w={46} d={42} h={30} color="#d1a16a" shadow={false}
+        top={<rect x={19} y={0} width={8} height={42} fill="#e8c08f" opacity={0.85} />}
+        left={<text x={5} y={17} fontSize={5.5} fontWeight={800} fill="#7c4f22">FRAGILE ↑↑</text>}
+      />
+      <Technician
+        x={P(700, 500)[0]}
+        y={P(700, 500)[1]}
+        armLeft={-70}
+        armRight={-35}
+        armLeftClass="sr-arm-write"
+        headClass="sr-head-check"
+        prop={<Clipboard />}
+      />
+      {/* Scanner beam from the checker's clipboard hand to the box label */}
+      <line x1={P(700, 500)[0] + 22} y1={P(700, 500)[1] - 52} x2={P(722, 452, 30)[0]} y2={P(722, 452, 30)[1]} stroke="#ef4444" strokeWidth={1.2} className="sr-scan" />
+
       {/* Technician D: walks across the front carrying a replacement filter */}
       <g className="sr-walk-path">
         <g className="sr-walk-flip">
@@ -1116,6 +1217,7 @@ export function ProductShowroomHero() {
   const en = language === 'en';
 
   const [active, setActive] = useState<HotMeta | null>(null);
+  const [inspecting, setInspecting] = useState<InspectTarget | null>(null);
   const timer = useRef<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -1129,6 +1231,19 @@ export function ProductShowroomHero() {
     (m: HotMeta) => {
       cancelClose();
       setActive(m);
+    },
+    [cancelClose],
+  );
+  // Clicking a unit brings it to the front as a 3D model, flying out from where it sits.
+  const inspect = useCallback(
+    (m: HotMeta) => {
+      cancelClose();
+      setActive(null);
+      const r = wrapRef.current?.getBoundingClientRect();
+      const origin = r
+        ? { x: r.left + (m.anchor[0] / VB_W) * r.width, y: r.top + (m.anchor[1] / VB_H) * r.height }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      setInspecting({ catalogId: m.catalogId, variant: m.variant, origin });
     },
     [cancelClose],
   );
@@ -1182,10 +1297,15 @@ export function ProductShowroomHero() {
           </p>
         </header>
 
-        <HotContext.Provider value={{ active, open, scheduleClose, cancelClose }}>
+        <HotContext.Provider value={{ active, open, inspect, scheduleClose, cancelClose }}>
           <div ref={wrapRef} className="sr-scene-wrap relative mt-2 sm:mt-0">
             <ShowroomScene />
             {active && <ProductPopover meta={active} onClose={() => setActive(null)} />}
+            <Suspense fallback={null}>
+              <AnimatePresence>
+                {inspecting && <AirconInspector key={inspecting.catalogId + inspecting.variant} target={inspecting} onClose={() => setInspecting(null)} />}
+              </AnimatePresence>
+            </Suspense>
 
             <div className="sr-cta">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-5">
