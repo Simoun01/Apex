@@ -11,7 +11,8 @@ const _emissiveCyan = new THREE.Color('#22D3EE');
 const _emissiveOrange = new THREE.Color('#F97316');
 const _emissiveBlack = new THREE.Color('#000000');
 
-export function CommercialVRFOutdoor() {
+/** `branchOnly`: draw just the VRF branch selector; the outdoor modules come from the detailed models. */
+export function CommercialVRFOutdoor({ branchOnly = false }: { branchOnly?: boolean } = {}) {
   const { invalidate } = useThree();
   const service = useHVACStore((s) => s.service);
   const exploded = useHVACStore((s) => s.exploded);
@@ -135,6 +136,7 @@ export function CommercialVRFOutdoor() {
       </group>
 
       {/* Main Rooftop Unit Cluster */}
+      {!branchOnly && (
       <group position={[2.85, 2.68, -1.25]}>
         {/* Heavy I-Beam Mounting Skid */}
         <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
@@ -265,6 +267,7 @@ export function CommercialVRFOutdoor() {
           </Html>
         )}
       </group>
+      )}
     </group>
   );
 }

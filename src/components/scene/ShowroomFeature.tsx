@@ -1,10 +1,11 @@
 import { ContactShadows, OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { BRANDS } from '../../data/airconBrands';
 import type { BrandId, UnitKind } from '../../data/airconBrands';
-import { ExplodeProvider, MODELS, StudioEnvironment, UNIT_SIZE, productScale } from './airconModels';
+import { usePartGuide } from '../../store/usePartGuide';
+import { ExplodeProvider, InteractionCtx, MODELS, StudioEnvironment, UNIT_SIZE, productScale } from './airconModels';
 import type { ExplodeRef, Motion } from './airconModels';
 
 /* ============================================================================
@@ -31,11 +32,23 @@ function Featured({ kind, brandId, explodeRef, exploded, en }: { kind: UnitKind;
     g.rotation.y = (1 - k) * -0.6;
   });
 
+  const showGuide = usePartGuide((s) => s.show);
+  const guide = usePartGuide((s) => s.open);
+  const interaction = useMemo(
+    () => ({
+      onPick: (partId: string) => showGuide({ kind, brandId, partId }),
+      selected: guide && guide.kind === kind ? guide.partId : null,
+    }),
+    [kind, brandId, guide, showGuide],
+  );
+
   return (
     <group ref={group} scale={base * 0.8}>
-      <ExplodeProvider explodeRef={explodeRef} labels en={en} spread={1.9}>
-        <Model brand={brand} motionRef={motion} />
-      </ExplodeProvider>
+      <InteractionCtx.Provider value={interaction}>
+        <ExplodeProvider explodeRef={explodeRef} labels en={en} spread={1.9}>
+          <Model brand={brand} motionRef={motion} />
+        </ExplodeProvider>
+      </InteractionCtx.Provider>
     </group>
   );
 }

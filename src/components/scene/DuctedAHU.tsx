@@ -13,7 +13,8 @@ const _emissiveBlack = new THREE.Color('#000000');
 const _cleanMetal = new THREE.Color('#cbd5e1');
 const _dirtyMetal = new THREE.Color('#665647');
 
-export function DuctedAHU() {
+/** `ductsOnly`: draw just the ductwork & diffusers; the AHU and cassette come from the detailed models. */
+export function DuctedAHU({ ductsOnly = false }: { ductsOnly?: boolean } = {}) {
   const { invalidate } = useThree();
   const service = useHVACStore((s) => s.service);
   const exploded = useHVACStore((s) => s.exploded);
@@ -115,6 +116,7 @@ export function DuctedAHU() {
   return (
     <group name="commercial-indoor-hvac">
       {/* Concealed Ceiling Ducted AHU (Air Handling Unit) */}
+      {!ductsOnly && (
       <group position={[-1.95, 2.55, -1.6]}>
         {/* Main Insulated Sheet-Metal Cabinet */}
         <mesh castShadow receiveShadow>
@@ -221,6 +223,7 @@ export function DuctedAHU() {
           />
         </mesh>
       </group>
+      )}
 
       {/* Insulated Supply Ductwork Trunk + Branch Plenums */}
       {showDucts && (
@@ -318,7 +321,7 @@ export function DuctedAHU() {
       )}
 
       {/* 4-Way Ceiling Cassette Unit */}
-      {showCassette && (
+      {showCassette && !ductsOnly && (
         <group position={[-0.25, 2.48, -1.35]}>
           {/* Concealed Body */}
           <mesh castShadow>

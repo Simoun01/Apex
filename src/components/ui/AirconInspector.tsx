@@ -10,7 +10,8 @@ import { BRANDS, CATALOG_KIND, KINDS, featuresFor, specFor } from '../../data/ai
 import type { Brand, BrandId, PartId, UnitKind } from '../../data/airconBrands';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
-import { ExplodeProvider, MODELS, StudioEnvironment } from '../scene/airconModels';
+import { ExplodeProvider, InteractionCtx, MODELS, StudioEnvironment } from '../scene/airconModels';
+import { usePartGuide } from '../../store/usePartGuide';
 import type { ExplodeRef, Motion, MotionRef, V3 } from '../scene/airconModels';
 import { tr } from '../../i18n/tr';
 
@@ -222,9 +223,11 @@ function Stage({ kind, brand, motionRef, explodeRef, exploded, en, parts, picked
   const lift = kind === 'wall' ? 0.25 : 0;
   return (
     <group scale={s} position={[exploded ? 0 : kind === 'wall' ? -0.5 : kind === 'floor' ? -0.35 : 0, exploded ? 0 : lift, 0]}>
-      <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en} spread={1.5}>
-        <Model brand={brand} motionRef={motionRef} companion={!exploded} />
-      </ExplodeProvider>
+      <InteractionCtx.Provider value={{ onPick: (partId) => usePartGuide.getState().show({ kind, brandId: brand.id, partId }) }}>
+        <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en} spread={1.5}>
+          <Model brand={brand} motionRef={motionRef} companion={!exploded} />
+        </ExplodeProvider>
+      </InteractionCtx.Provider>
       {!exploded && <Airflow kind={kind} motionRef={motionRef} />}
       {!exploded && picked !== null && <Highlight a={anchorOf(kind, parts[picked])} color={brand.accent} />}
       {!exploded && parts.map((part, i) => {

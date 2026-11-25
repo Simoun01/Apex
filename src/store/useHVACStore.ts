@@ -165,14 +165,8 @@ interface HVACState {
   setWhyApexOpen: (val: boolean) => void;
 }
 
-const detectInitialQuality = (): QualityTier => {
-  if (typeof window === 'undefined') return 'high';
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
-  const navWithMem = navigator as Navigator & { deviceMemory?: number };
-  const lowMem = typeof navWithMem.deviceMemory === 'number' && navWithMem.deviceMemory <= 4;
-  if (isMobile || lowMem) return 'low';
-  return 'high';
-};
+/** Every visitor starts on Low graphics (fast on any device); they can raise it in Settings. */
+const detectInitialQuality = (): QualityTier => 'low';
 
 const detectReducedMotion = (): boolean => {
   if (typeof window === 'undefined') return false;

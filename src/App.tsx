@@ -30,6 +30,7 @@ import { MobileSheet } from './components/ui/MobileSheet';
 import { Non3DFallback } from './components/ui/Non3DFallback';
 import { ProductShowroomHero } from './components/ui/ProductShowroomHero';
 import { htmlLang, tr } from './i18n/tr';
+import { usePartGuide } from './store/usePartGuide';
 import { QuoteModal } from './components/ui/QuoteModal';
 import { TopBar } from './components/ui/TopBar';
 import { parseRouteFromLocation, useHVACStore } from './store/useHVACStore';
@@ -37,6 +38,7 @@ import { parseRouteFromLocation, useHVACStore } from './store/useHVACStore';
 const HVACCanvas = lazy(() =>
   import('./components/scene/HVACCanvas').then((m) => ({ default: m.HVACCanvas })),
 );
+const PartGuideCard = lazy(() => import('./components/ui/PartGuideCard'));
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -157,6 +159,7 @@ export default function App() {
   const non3dMode = useHVACStore((s) => s.non3dMode);
   const language = useHVACStore((s) => s.language);
   const applyPopStateRoute = useHVACStore((s) => s.applyPopStateRoute);
+  const partGuideOpen = usePartGuide((s) => s.open !== null);
 
   useEffect(() => {
     document.documentElement.lang = htmlLang(language);
@@ -248,6 +251,13 @@ export default function App() {
       </main>
 
       <QuoteModal />
+
+      {/* "How it works" card for any clicked aircon part (experience + showroom) */}
+      {partGuideOpen && (
+        <Suspense fallback={null}>
+          <PartGuideCard />
+        </Suspense>
+      )}
     </div>
   );
 }

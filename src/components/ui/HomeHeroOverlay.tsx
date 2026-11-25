@@ -8,8 +8,7 @@ function preloadStage2Chunks() {
   if (chunksPreloaded) return;
   chunksPreloaded = true;
   void import('../scene/RoomShell');
-  void import('../scene/ResidentialEquipmentVariants');
-  void import('../scene/SplitUnitOutdoor');
+  void import('../scene/ExperienceUnits');
   void import('../scene/DuctedAHU');
   void import('../scene/CommercialVRFOutdoor');
   void import('../scene/PipingAndDuctRoute');

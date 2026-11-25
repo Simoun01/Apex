@@ -1,6 +1,6 @@
 import { Html, RoundedBox } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -69,7 +69,78 @@ export function ExplodeProvider({
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** A sub-assembly that slides out along `dir` by `dist` (metres) in the exploded view. */
+/* ── Interaction: click-to-explain, highlights, x-ray, dirt, isolate ──────── */
+
+export interface ModelInteraction {
+  /** Called with the part id when the visitor clicks a part */
+  onPick?: (partId: string) => void;
+  /** Part shown as selected (orange outline) */
+  selected?: string | null;
+  /** Parts lit by a symptom / service (cyan outline) */
+  highlighted?: string[];
+  /** Ghost the outer casing so the internals show */
+  xray?: boolean;
+  /** 0 = clean … 1 = heavily soiled coils, filters and fans */
+  dirt?: number;
+  /** Render only this part (used for the part illustration) */
+  isolate?: string | null;
+}
+
+export const InteractionCtx = createContext<ModelInteraction>({});
+
+/** Outer casing parts: ghosted in x-ray */
+const SHELL_IDS = new Set(['panel', 'casing', 'top', 'frame']);
+/** Parts that collect dust: tinted by `dirt` */
+const DIRTY_IDS = new Set(['coil', 'filter', 'crossflow', 'blower', 'fan', 'condenser']);
+const DIRT = new THREE.Color('#6b5b4b');
+
+type MatLike = THREE.Material & { color?: THREE.Color; opacity: number };
+function eachMaterial(root: THREE.Object3D, fn: (m: MatLike) => void) {
+  root.traverse((o) => {
+    if (o.userData.glow) return;
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach((m) => m && fn(m as MatLike));
+  });
+}
+
+/** Outline box around a part, sized from the part's own geometry. */
+function PartGlow({ host, color, pulse }: { host: THREE.Group; color: string; pulse: boolean }) {
+  const mat = useRef<THREE.MeshBasicMaterial>(null);
+  const { size, center } = useMemo(() => {
+    const box = new THREE.Box3();
+    const inv = host.matrixWorld.clone().invert();
+    host.children.forEach((c) => {
+      if (c.userData.glow) return;
+      const b = new THREE.Box3().setFromObject(c);
+      if (!b.isEmpty()) box.union(b);
+    });
+    if (box.isEmpty()) return { size: new THREE.Vector3(), center: new THREE.Vector3() };
+    box.applyMatrix4(inv);
+    return { size: box.getSize(new THREE.Vector3()).addScalar(0.015), center: box.getCenter(new THREE.Vector3()) };
+  }, [host]);
+  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x, size.y, size.z)), [size]);
+  useEffect(() => () => edges.dispose(), [edges]);
+  useFrame(({ clock }) => {
+    if (mat.current) mat.current.opacity = pulse ? 0.12 + (Math.sin(clock.elapsedTime * 4) + 1) * 0.08 : 0.08;
+  });
+  if (size.lengthSq() === 0) return null;
+  return (
+    <group position={center} userData={{ glow: true }}>
+      <mesh renderOrder={20} userData={{ glow: true }} raycast={() => null}>
+        <boxGeometry args={[size.x, size.y, size.z]} />
+        <meshBasicMaterial ref={mat} color={color} transparent opacity={0.15} depthWrite={false} depthTest={false} toneMapped={false} />
+      </mesh>
+      <lineSegments geometry={edges} renderOrder={21} userData={{ glow: true }} raycast={() => null}>
+        <lineBasicMaterial color={color} transparent depthTest={false} toneMapped={false} />
+      </lineSegments>
+    </group>
+  );
+}
+
+/** A sub-assembly that slides out along `dir` by `dist` (metres) in the exploded view.
+ *  It is also the unit of interaction: clickable, highlightable, x-ray-able and isolatable. */
 export function Part({
   id,
   en,
@@ -89,8 +160,11 @@ export function Part({
   children: ReactNode;
 }) {
   const ctx = useContext(ExplodeCtx);
+  const ix = useContext(InteractionCtx);
   const ref = useRef<THREE.Group>(null);
   const label = useRef<HTMLDivElement>(null);
+  const [host, setHost] = useState<THREE.Group | null>(null);
+  const [hover, setHover] = useState(false);
   const n = useMemo(() => {
     const v = new THREE.Vector3(...dir);
     return v.lengthSq() > 0 ? v.normalize() : v;
@@ -107,9 +181,82 @@ export function Part({
     }
   });
 
+  // X-ray: ghost the casing
+  const ghost = Boolean(ix.xray && SHELL_IDS.has(id));
+  useEffect(() => {
+    const g = ref.current;
+    if (!g) return;
+    eachMaterial(g, (m) => {
+      if (m.userData.xrayBase === undefined) m.userData.xrayBase = { o: m.opacity, t: m.transparent, d: m.depthWrite };
+      const b = m.userData.xrayBase as { o: number; t: boolean; d: boolean };
+      m.opacity = ghost ? Math.min(b.o, 0.14) : b.o;
+      m.transparent = ghost ? true : b.t;
+      m.depthWrite = ghost ? false : b.d;
+      m.needsUpdate = true;
+    });
+    // A ghosted casing lets clicks through to the parts inside it
+    g.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || o.userData.glow) return;
+      if (ghost) mesh.raycast = () => {};
+      else delete (mesh as Partial<THREE.Mesh>).raycast;
+    });
+  }, [ghost]);
+
+  // Dirt: tint dust-collecting parts
+  const dirt = DIRTY_IDS.has(id) ? Math.max(0, Math.min(1, ix.dirt ?? 0)) : 0;
+  useEffect(() => {
+    const g = ref.current;
+    if (!g || !DIRTY_IDS.has(id)) return;
+    eachMaterial(g, (m) => {
+      if (!m.color) return;
+      if (!m.userData.dirtBase) m.userData.dirtBase = m.color.clone();
+      m.color.copy(m.userData.dirtBase as THREE.Color).lerp(DIRT, dirt * 0.8);
+    });
+  }, [dirt, id]);
+
+  if (ix.isolate && ix.isolate !== id) return null;
+
+  const selected = ix.selected === id;
+  const lit = !selected && Boolean(ix.highlighted?.includes(id));
+  const glowColor = selected ? '#f97316' : lit ? '#22d3ee' : hover ? '#e2e8f0' : null;
+  const pickable = Boolean(ix.onPick) && !ix.isolate;
+
   return (
-    <group ref={ref} name={id}>
+    <group
+      ref={(g) => {
+        ref.current = g;
+        if (g && g !== host) setHost(g);
+      }}
+      name={id}
+      onClick={
+        pickable
+          ? (e) => {
+              e.stopPropagation();
+              ix.onPick!(id);
+            }
+          : undefined
+      }
+      onPointerOver={
+        pickable
+          ? (e) => {
+              e.stopPropagation();
+              setHover(true);
+              document.body.style.cursor = 'pointer';
+            }
+          : undefined
+      }
+      onPointerOut={
+        pickable
+          ? () => {
+              setHover(false);
+              document.body.style.cursor = 'auto';
+            }
+          : undefined
+      }
+    >
       {children}
+      {host && glowColor && <PartGlow host={host} color={glowColor} pulse={selected || lit} />}
       {ctx?.labels && (
         <Html position={at} center zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
           <div ref={label} className="am-label" style={{ opacity: 0, visibility: 'hidden' }}>
@@ -627,16 +774,27 @@ function CompanionOutdoor({ brand, motionRef, at }: ModelProps & { at: V3 }) {
 export function OutdoorCondenser({ brand, motionRef }: ModelProps) {
   return (
     <group>
-      <RB s={[0.78, 0.56, 0.3]} radius={0.02} m={<Painted color={brand.body} />} />
-      <group position={[-0.1, 0, 0.152]}>
-        <Propeller r={0.21} motionRef={motionRef} rate={11} color="#4b5563" />
-      </group>
-      <Fins count={12} size={[0.18, 0.006, 0.01]} gap={0.036} axis="y" p={[0.27, 0, 0.152]} color={brand.trim} />
-      <Fins count={60} size={[0.0016, 0.5, 0.012]} gap={0.012} p={[0, 0, -0.152]} />
-      {[0.33, 0.37].map((x) => (
-        <Cyl key={x} p={[x, -0.2, 0.17]} r={[Math.PI / 2, 0, 0]} rad={0.012} len={0.04} m={<meshStandardMaterial {...BRASS} />} />
-      ))}
-      <B p={[0.26, 0.18, 0.152]} s={[0.12, 0.05, 0.004]} m={<Matte color="#cbd5e1" />} shadow={false} />
+      <Part id="casing" en="Outdoor cabinet" tl="Outdoor cabinet" dir={[0, 1, 0]} dist={0.42} at={[0.2, 0.3, 0.1]}>
+        <RB s={[0.78, 0.56, 0.3]} radius={0.02} m={<Painted color={brand.body} />} />
+        <Fins count={12} size={[0.18, 0.006, 0.01]} gap={0.036} axis="y" p={[0.27, 0, 0.152]} color={brand.trim} />
+        <B p={[0.26, 0.18, 0.152]} s={[0.12, 0.05, 0.004]} m={<Matte color="#cbd5e1" />} shadow={false} />
+      </Part>
+      <Part id="fan" en="Condenser fan & guard" tl="Condenser fan" dir={[0, 0, 1]} dist={0.32} at={[-0.1, 0.24, 0.2]}>
+        <group position={[-0.1, 0, 0.152]}>
+          <Propeller r={0.21} motionRef={motionRef} rate={11} color="#4b5563" />
+        </group>
+      </Part>
+      <Part id="compressor" en="Inverter compressor" tl="Inverter compressor" dir={[1, 0, 0.3]} dist={0.42} at={[0.27, 0.05, 0]}>
+        <Compressor p={[0.25, -0.06, -0.02]} h={0.3} rad={0.075} />
+      </Part>
+      <Part id="coil" en="Condenser coil" tl="Condenser coil" dir={[0, 0, -1]} dist={0.3} at={[0, 0.3, -0.17]}>
+        <Fins count={60} size={[0.0016, 0.5, 0.012]} gap={0.012} p={[0, 0, -0.152]} />
+      </Part>
+      <Part id="ports" en="Service valves" tl="Service valves" dir={[1, -0.3, 0.6]} dist={0.3} at={[0.35, -0.25, 0.18]}>
+        {[0.33, 0.37].map((x) => (
+          <Cyl key={x} p={[x, -0.2, 0.17]} r={[Math.PI / 2, 0, 0]} rad={0.012} len={0.04} m={<meshStandardMaterial {...BRASS} />} />
+        ))}
+      </Part>
     </group>
   );
 }
@@ -1043,6 +1201,10 @@ export const MODELS: Record<UnitKind, (p: ModelProps) => ReactNode> = {
   ducted: DuctedModel,
   cassette: CassetteModel,
 };
+
+/** Every model that can be explained part by part, including the split outdoor unit. */
+export type FigureKind = UnitKind | 'outdoor';
+export const FIGURE_MODELS: Record<FigureKind, (p: ModelProps) => ReactNode> = { ...MODELS, outdoor: OutdoorCondenser };
 
 /** Overall size of each unit (width, height, depth) for framing the camera. */
 export const UNIT_SIZE: Record<UnitKind, V3> = {

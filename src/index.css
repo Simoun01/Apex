@@ -1278,3 +1278,130 @@ textarea:focus-visible {
 
 .ai-pins { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .ai-pins .ai-pin { pointer-events: auto; }
+
+/* ============================================================================
+   PART GUIDE CARD (pg-) — "how it works" for a clicked aircon part
+   ============================================================================ */
+.pg-card {
+  --pg-accent: #22d3ee;
+  position: fixed;
+  z-index: 130;
+  left: 16px;
+  top: 76px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--pg-accent) 45%, rgba(148, 163, 184, 0.25));
+  background: linear-gradient(180deg, rgba(12, 28, 51, 0.98) 0%, rgba(7, 17, 31, 0.98) 100%);
+  box-shadow: 0 28px 70px rgba(2, 6, 23, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: #e2e8f0;
+  scrollbar-width: thin;
+}
+.pg-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(7, 17, 31, 0.8);
+  color: #cbd5e1;
+}
+.pg-close:hover { color: #fff; border-color: var(--pg-accent); }
+.pg-figure {
+  position: relative;
+  height: 190px;
+  background:
+    radial-gradient(ellipse 60% 60% at 50% 55%, color-mix(in srgb, var(--pg-accent) 18%, transparent), transparent 70%),
+    radial-gradient(ellipse 80% 70% at 50% 50%, #142a47 0%, #0a1628 75%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px 16px 0 0;
+}
+.pg-body { padding: 14px 16px 16px; }
+.pg-eyebrow {
+  font-family: var(--font-tech-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pg-accent);
+}
+.pg-title {
+  margin-top: 3px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fff;
+}
+.pg-role { margin-top: 4px; font-size: 13px; line-height: 1.5; color: #cbd5e1; }
+.pg-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.pg-steps { margin-top: 8px; display: grid; gap: 8px; }
+.pg-steps li { display: flex; gap: 10px; font-size: 13px; line-height: 1.45; color: #e2e8f0; }
+.pg-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pg-accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pg-accent) 60%, transparent);
+  color: #fff;
+  font: 800 11px/1 var(--font-display);
+}
+.pg-note {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.06);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  color: #a5f3fc;
+}
+.pg-note strong { display: block; font-size: 12px; color: #fff; }
+.pg-note p { margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: #cbd5e1; }
+.pg-note--warn { background: rgba(249, 115, 22, 0.07); border-color: rgba(249, 115, 22, 0.25); color: #fdba74; }
+.pg-cta {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  min-height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f5b544 0%, #e0961a 100%);
+  color: #1c1204;
+  font: 700 13px/1 var(--font-display);
+}
+.pg-cta:hover { filter: brightness(1.06); }
+
+@media (max-width: 767px) {
+  .pg-card {
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 8px;
+    width: auto;
+    max-height: 72vh;
+  }
+  .pg-figure { height: 150px; }
+}

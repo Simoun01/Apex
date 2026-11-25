@@ -516,5 +516,9 @@ export const ZH: Record<string, string> = {
   'Condenser Coil': '冷凝器盘管',
   '4-Way Cassette Fascia': '四面出风天花机面板',
   'Leak & Vacuum Verified': '检漏与抽真空已确认',
+  'Outdoor cabinet': '室外机外壳',
+  'Condenser fan & guard': '冷凝器风扇与护网',
+  'Inverter compressor': '变频压缩机',
+  'Service valves': '检修阀',
   'Commissioning Readings': '调试读数',
 };

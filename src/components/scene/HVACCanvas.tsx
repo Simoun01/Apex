@@ -12,14 +12,8 @@ import { PostProcessingRig } from './PostProcessingRig';
 import { DEFAULT_CAMERA_FOV, getCameraPresetConfig } from './hvacSceneUtils';
 
 const RoomShell = lazy(() => import('./RoomShell').then((m) => ({ default: m.RoomShell })));
-const ResidentialEquipmentVariants = lazy(() =>
-  import('./ResidentialEquipmentVariants').then((m) => ({
-    default: m.ResidentialEquipmentVariants,
-  })),
-);
-const SplitUnitOutdoor = lazy(() =>
-  import('./SplitUnitOutdoor').then((m) => ({ default: m.SplitUnitOutdoor })),
-);
+const ResidentialUnits = lazy(() => import('./ExperienceUnits').then((m) => ({ default: m.ResidentialUnits })));
+const CommercialUnits = lazy(() => import('./ExperienceUnits').then((m) => ({ default: m.CommercialUnits })));
 const DuctedAHU = lazy(() => import('./DuctedAHU').then((m) => ({ default: m.DuctedAHU })));
 const CommercialVRFOutdoor = lazy(() =>
   import('./CommercialVRFOutdoor').then((m) => ({ default: m.CommercialVRFOutdoor })),
@@ -53,7 +47,8 @@ function detectSoftwareGlAndSupport(): { supported: boolean; isSoftwareGl: boole
 function getTargetDpr(quality: QualityTier, isSoftwareGl: boolean): number {
   if (isSoftwareGl) return 1;
   const nativeDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  if (quality === 'low') return 0.65;
+  // Low is everyone's default: keep it crisp (1×) but skip shadows / post effects for speed.
+  if (quality === 'low') return Math.min(nativeDpr, 1);
   if (quality === 'medium') return Math.min(nativeDpr, 1.15);
   return Math.min(nativeDpr, 2);
 }
@@ -284,15 +279,16 @@ function Stage2InteriorRig({
 
       <Suspense fallback={null}>
         <RoomShell isSoftwareGl={isSoftwareGl} />
+        {/* Realistic, click-to-explain units (residential split / window / floor + outdoor;
+            commercial ducted AHU, cassette, rooftop VRF or packaged). The commercial
+            ductwork, diffusers and VRF branch box still come from the original components. */}
         {audience === 'residential' ? (
-          <>
-            <ResidentialEquipmentVariants />
-            <SplitUnitOutdoor />
-          </>
+          <ResidentialUnits />
         ) : (
           <>
-            <DuctedAHU />
-            <CommercialVRFOutdoor />
+            <CommercialUnits />
+            <DuctedAHU ductsOnly />
+            <CommercialVRFOutdoor branchOnly />
           </>
         )}
         <PipingAndDuctRoute />
