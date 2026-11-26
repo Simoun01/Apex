@@ -1,6 +1,6 @@
 import { Html, OrbitControls, ContactShadows } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Boxes, CalendarCheck, Gauge, RotateCcw, Wind, X, Zap } from 'lucide-react';
+import { Boxes, CalendarCheck, Gauge, RotateCcw, Tag, Wind, X, Zap } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -9,8 +9,9 @@ import * as THREE from 'three';
 import { BRANDS, CATALOG_KIND, KINDS, featuresFor, specFor } from '../../data/airconBrands';
 import type { Brand, BrandId, PartId, UnitKind } from '../../data/airconBrands';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
+import { partPrice, partsTotal, peso, priceLineTotal, priceRange } from '../../data/partPrices';
 import { useHVACStore } from '../../store/useHVACStore';
-import { ExplodeProvider, InteractionCtx, MODELS, StudioEnvironment } from '../scene/airconModels';
+import { ExplodeProvider, InteractionCtx, MODELS, MODEL_PARTS, StudioEnvironment } from '../scene/airconModels';
 import { usePartGuide } from '../../store/usePartGuide';
 import type { ExplodeRef, Motion, MotionRef, V3 } from '../scene/airconModels';
 import { tr } from '../../i18n/tr';
@@ -115,31 +116,101 @@ const ANCHORS: Record<UnitKind, Partial<Record<PartId | 'body', Anchor>>> = {
   },
 };
 
-/* ── Airflow: cold air out of the outlet, warm air off condensers ── */
+/* ── Airflow ─────────────────────────────────────────────────────────────────
+   Three roles, so the visitor can see where air goes in and where it comes out:
+     intake  — warm room air (or outdoor air) drawn INTO the unit, through the
+               filter / intake grille. Particles travel toward the machine.
+     supply  — cold, dehumidified air blown back into the room.
+     reject  — the heat taken out of the room, thrown off the condenser.
+   ──────────────────────────────────────────────────────────────────────── */
 
-const FLOW: Record<UnitKind, { from: V3; spread: V3; dir: V3; warm: boolean }[]> = {
+type FlowRole = 'intake' | 'supply' | 'reject';
+
+interface Stream {
+  from: V3;
+  spread: V3;
+  dir: V3;
+  role: FlowRole;
+  /** Put a floating label on this stream (one per role is enough) */
+  tag?: boolean;
+}
+
+const ROLE_COLOR: Record<FlowRole, string> = {
+  intake: '#a5b4c8',
+  supply: '#7dd3fc',
+  reject: '#fb923c',
+};
+
+const FLOW: Record<UnitKind, Stream[]> = {
   wall: [
-    { from: [0, -0.13, 0.14], spread: [0.8, 0.01, 0.02], dir: [0, -0.5, 1], warm: false },
-    { from: [0.62, -0.7, -0.27], spread: [0.15, 0.15, 0.01], dir: [0, 0, 1], warm: true },
+    { from: [0, 0.3, -0.02], spread: [0.84, 0.02, 0.16], dir: [0, -1, 0], role: 'intake', tag: true },
+    { from: [0, -0.13, 0.14], spread: [0.8, 0.01, 0.02], dir: [0, -0.5, 1], role: 'supply', tag: true },
+    { from: [0.82, -0.72, -0.62], spread: [0.18, 0.2, 0.01], dir: [0, 0, -1], role: 'intake' },
+    { from: [0.62, -0.7, -0.27], spread: [0.15, 0.15, 0.01], dir: [0, 0.2, 1], role: 'reject', tag: true },
   ],
   floor: [
-    { from: [0, 0.42, 0.18], spread: [0.34, 0.5, 0.01], dir: [0, 0.05, 1], warm: false },
-    { from: [0.83, -0.6, -0.39], spread: [0.15, 0.15, 0.01], dir: [0, 0, 1], warm: true },
+    { from: [0, -0.5, 0.46], spread: [0.42, 0.26, 0.02], dir: [0, 0, -1], role: 'intake', tag: true },
+    { from: [0, 0.42, 0.18], spread: [0.34, 0.5, 0.01], dir: [0, 0.05, 1], role: 'supply', tag: true },
+    { from: [0.83, -0.6, -0.39], spread: [0.15, 0.15, 0.01], dir: [0, 0.2, 1], role: 'reject', tag: true },
   ],
   window: [
-    { from: [-0.07, 0.12, 0.37], spread: [0.4, 0.1, 0.01], dir: [0, 0.15, 1], warm: false },
-    { from: [0, 0, -0.37], spread: [0.3, 0.25, 0.01], dir: [0, 0.1, -1], warm: true },
+    { from: [-0.07, -0.1, 0.56], spread: [0.42, 0.08, 0.02], dir: [0, 0.05, -1], role: 'intake', tag: true },
+    { from: [-0.07, 0.12, 0.37], spread: [0.4, 0.1, 0.01], dir: [0, 0.15, 1], role: 'supply', tag: true },
+    { from: [0.38, 0, -0.1], spread: [0.02, 0.2, 0.3], dir: [-1, 0, 0], role: 'intake' },
+    { from: [0, 0, -0.37], spread: [0.3, 0.25, 0.01], dir: [0, 0.1, -1], role: 'reject', tag: true },
   ],
-  vrf: [{ from: [0, 0.84, 0], spread: [0.5, 0.01, 0.5], dir: [0, 1, 0], warm: true }],
-  packaged: [{ from: [0, 0.44, -0.14], spread: [1.1, 0.01, 0.4], dir: [0, 1, 0], warm: true }],
-  ducted: [{ from: [0, 0, 0.42], spread: [0.86, 0.18, 0.01], dir: [0, 0, 1], warm: false }],
+  vrf: [
+    { from: [0.62, 0.05, 0], spread: [0.02, 0.7, 0.4], dir: [-1, 0, 0], role: 'intake', tag: true },
+    { from: [-0.62, 0.05, 0], spread: [0.02, 0.7, 0.4], dir: [1, 0, 0], role: 'intake' },
+    { from: [0, 0.84, 0], spread: [0.5, 0.01, 0.5], dir: [0, 1, 0], role: 'reject', tag: true },
+  ],
+  packaged: [
+    { from: [0.95, -0.1, 0.3], spread: [0.02, 0.3, 0.5], dir: [-1, 0, 0], role: 'intake', tag: true },
+    { from: [0, 0.44, -0.14], spread: [1.1, 0.01, 0.4], dir: [0, 1, 0], role: 'reject', tag: true },
+    { from: [0.45, -0.25, 0.62], spread: [0.3, 0.2, 0.01], dir: [0, -0.2, 1], role: 'supply', tag: true },
+  ],
+  ducted: [
+    { from: [0, 0, -0.56], spread: [0.9, 0.22, 0.02], dir: [0, 0, 1], role: 'intake', tag: true },
+    { from: [0, 0, 0.42], spread: [0.86, 0.18, 0.01], dir: [0, 0, 1], role: 'supply', tag: true },
+  ],
   cassette: [
-    { from: [0, 0.13, 0.33], spread: [0.5, 0.01, 0.01], dir: [0, 0.6, 1], warm: false },
-    { from: [0, 0.13, -0.33], spread: [0.5, 0.01, 0.01], dir: [0, 0.6, -1], warm: false },
-    { from: [0.33, 0.13, 0], spread: [0.01, 0.01, 0.5], dir: [1, 0.6, 0], warm: false },
-    { from: [-0.33, 0.13, 0], spread: [0.01, 0.01, 0.5], dir: [-1, 0.6, 0], warm: false },
+    { from: [0, 0.38, 0], spread: [0.34, 0.02, 0.34], dir: [0, -1, 0], role: 'intake', tag: true },
+    { from: [0, 0.13, 0.33], spread: [0.5, 0.01, 0.01], dir: [0, 0.6, 1], role: 'supply', tag: true },
+    { from: [0, 0.13, -0.33], spread: [0.5, 0.01, 0.01], dir: [0, 0.6, -1], role: 'supply' },
+    { from: [0.33, 0.13, 0], spread: [0.01, 0.01, 0.5], dir: [1, 0.6, 0], role: 'supply' },
+    { from: [-0.33, 0.13, 0], spread: [0.01, 0.01, 0.5], dir: [-1, 0.6, 0], role: 'supply' },
   ],
 };
+
+const ROLE_TEXT: Record<FlowRole, { en: string; tl: string; zh: string }> = {
+  intake: { en: 'Intake · warm room air in', tl: 'Intake · pasok na maligamgam na hangin', zh: '进风 · 吸入室内热空气' },
+  supply: { en: 'Outlet · cold air out', tl: 'Labasan · lumalabas na malamig na hangin', zh: '出风 · 送出冷风' },
+  reject: { en: 'Condenser · hot air thrown out', tl: 'Condenser · init na itinatapon palabas', zh: '冷凝器 · 排出热空气' },
+};
+
+/** Floating tags on the model showing where air goes in and comes out. */
+function AirTags({ kind, pinRoot }: { kind: UnitKind; pinRoot: RefObject<HTMLDivElement | null> }) {
+  const seen = new Set<FlowRole>();
+  return (
+    <>
+      {FLOW[kind].map((s, i) => {
+        if (!s.tag || seen.has(s.role)) return null;
+        seen.add(s.role);
+        const t = ROLE_TEXT[s.role];
+        // Sit the tag a little way along the stream, clear of the casing.
+        const at: V3 = [s.from[0] + s.dir[0] * 0.22, s.from[1] + s.dir[1] * 0.22 + 0.03, s.from[2] + s.dir[2] * 0.22];
+        return (
+          <Html key={`${s.role}${i}`} position={at} center zIndexRange={[28, 0]} portal={pinRoot as RefObject<HTMLElement>} style={{ pointerEvents: 'none' }}>
+            <span className="ai-flowtag" data-role={s.role}>
+              <i aria-hidden="true" style={{ background: ROLE_COLOR[s.role] }} />
+              {tr(t.en, t.tl, t.zh)}
+            </span>
+          </Html>
+        );
+      })}
+    </>
+  );
+}
 
 function Airflow({ kind, motionRef }: { kind: UnitKind; motionRef: MotionRef }) {
   const N = 70;
@@ -168,7 +239,7 @@ function Airflow({ kind, motionRef }: { kind: UnitKind; motionRef: MotionRef }) 
         const reach = 0.25 + sp * 0.9;
         const [a, b, c] = seeds[i];
         pos[i * 3] = s.from[0] + a * s.spread[0] + dir.x * t * reach + a * t * 0.15;
-        pos[i * 3 + 1] = s.from[1] + b * s.spread[1] + dir.y * t * reach + (s.warm ? 0 : -t * t * 0.08);
+        pos[i * 3 + 1] = s.from[1] + b * s.spread[1] + dir.y * t * reach + (s.role === 'supply' ? -t * t * 0.08 : 0);
         pos[i * 3 + 2] = s.from[2] + c * s.spread[2] + dir.z * t * reach + c * t * 0.15;
       }
       geo.attributes.position.needsUpdate = true;
@@ -178,7 +249,14 @@ function Airflow({ kind, motionRef }: { kind: UnitKind; motionRef: MotionRef }) 
     <>
       {groups.map(({ s, geo }, i) => (
         <points key={i} geometry={geo}>
-          <pointsMaterial size={0.018} color={s.warm ? '#fb923c' : '#7dd3fc'} transparent opacity={0.75} depthWrite={false} sizeAttenuation />
+          <pointsMaterial
+            size={s.role === 'intake' ? 0.014 : 0.018}
+            color={ROLE_COLOR[s.role]}
+            transparent
+            opacity={s.role === 'intake' ? 0.6 : 0.75}
+            depthWrite={false}
+            sizeAttenuation
+          />
         </points>
       ))}
     </>
@@ -217,18 +295,19 @@ function fitScale(kind: UnitKind) {
   return (kind === 'wall' || kind === 'floor' ? 1.45 : 1.2) / (Math.max(b[0] * extra, b[1], b[2]) || 1);
 }
 
-function Stage({ kind, brand, motionRef, explodeRef, exploded, en, parts, picked, onPick, labelOf, pinRoot }: { pinRoot: RefObject<HTMLDivElement | null>; kind: UnitKind; brand: Brand; motionRef: MotionRef; explodeRef: ExplodeRef; exploded: boolean; en: boolean; parts: PartId[]; picked: number | null; onPick: (i: number) => void; labelOf: (i: number) => string }) {
+function Stage({ kind, brand, motionRef, explodeRef, exploded, en, parts, picked, onPick, labelOf, pinRoot, variant, showFlow }: { pinRoot: RefObject<HTMLDivElement | null>; kind: UnitKind; brand: Brand; motionRef: MotionRef; explodeRef: ExplodeRef; exploded: boolean; en: boolean; parts: PartId[]; picked: number | null; onPick: (i: number) => void; labelOf: (i: number) => string; variant: string; showFlow: boolean }) {
   const Model = MODELS[kind];
   const s = fitScale(kind) * (exploded ? 0.72 : 1);
   const lift = kind === 'wall' ? 0.25 : 0;
   return (
     <group scale={s} position={[exploded ? 0 : kind === 'wall' ? -0.5 : kind === 'floor' ? -0.35 : 0, exploded ? 0 : lift, 0]}>
-      <InteractionCtx.Provider value={{ onPick: (partId) => usePartGuide.getState().show({ kind, brandId: brand.id, partId }) }}>
-        <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en} spread={1.5}>
+      <InteractionCtx.Provider value={{ onPick: (partId) => usePartGuide.getState().show({ kind, brandId: brand.id, partId, variant }) }}>
+        <ExplodeProvider explodeRef={explodeRef} labels={exploded} en={en} spread={1.5} kind={kind} variant={variant} prices>
           <Model brand={brand} motionRef={motionRef} companion={!exploded} />
         </ExplodeProvider>
       </InteractionCtx.Provider>
-      {!exploded && <Airflow kind={kind} motionRef={motionRef} />}
+      {!exploded && showFlow && <Airflow kind={kind} motionRef={motionRef} />}
+      {!exploded && showFlow && <AirTags kind={kind} pinRoot={pinRoot} />}
       {!exploded && picked !== null && <Highlight a={anchorOf(kind, parts[picked])} color={brand.accent} />}
       {!exploded && parts.map((part, i) => {
         const a = anchorOf(kind, part);
@@ -277,6 +356,7 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
   const [level, setLevel] = useState(Math.ceil(spec.fanSteps * 0.6));
   const [spinKey, setSpinKey] = useState(0);
   const [exploded, setExploded] = useState(Boolean(target.exploded));
+  const [showFlow, setShowFlow] = useState(true);
   const explodeRef = useRef({ amount: 0, target: 0 });
   explodeRef.current.target = exploded ? 1 : 0;
   const motionRef = useRef<Motion>({ speed: 0.6, target: 0.6 });
@@ -318,6 +398,13 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
     { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Fan speed (now)', 'Bilis ng fan'), value: `${fmt(rpmNow)} rpm`, sub: `${tr('step', 'level')} ${lvl}/${steps}` },
     { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Sound level', 'Ingay'), value: `${noiseNow} dBA`, sub: `${spec.noiseLow}–${spec.noiseHigh} dBA` },
   ];
+  // Parts list for the exploded view: what this model is actually built from.
+  const bom = MODEL_PARTS[kind] ?? [];
+  const bomRows = bom
+    .map((mp) => ({ ...mp, price: partPrice(kind, mp.id, target.variant)! }))
+    .filter((r) => r.price);
+  const bomTotal = partsTotal(kind, bom.map((mp) => mp.id), target.variant);
+
   const rows: [string, string][] = [
     [spec.effUnit === 'CSPF' ? 'CSPF' : 'EER', `${spec.eff.toFixed(2)}${spec.effUnit === 'EER' ? ' W/W' : ''}`],
     [tr('Compressor', 'Compressor'), spec.compressor],
@@ -349,6 +436,10 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
         >
           {/* ── 3D view ── */}
           <div className="ai-stage">
+            {/* Honest labelling: this is our own 3D model, not the brand's own product */}
+            <span className="ai-render-tag">
+              {tr('Our 3D model · illustrative, not the brand’s photo', 'Sarili naming 3D model · pang-ilustrasyon lang', '我方自制 3D 模型 · 仅作示意，非品牌照片')}
+            </span>
             <div ref={pinRoot} className="ai-pins" />
             <Canvas shadows resize={{ offsetSize: true }} dpr={[1, 2]} camera={{ position: narrow ? [2.1, 1.1, 3.9] : [1.5, 0.8, 2.7], fov: 36 }} gl={{ antialias: true, alpha: true }}>
               <StudioEnvironment intensity={0.9} />
@@ -369,6 +460,8 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                   picked={picked}
                   onPick={setPicked}
                   labelOf={(i) => tr(features[i].nameEn, features[i].nameTl)}
+                  variant={target.variant}
+                  showFlow={showFlow}
                 />
               </group>
               <SpeedEaser motionRef={motionRef} />
@@ -383,8 +476,33 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                 target={[0, 0, 0]}
               />
             </Canvas>
+            {/* Air path legend: where air goes in, where it comes out */}
+            {!exploded && showFlow && (
+              <div className="ai-flowkey" aria-hidden="true">
+                {(['intake', 'supply', 'reject'] as FlowRole[])
+                  .filter((r) => FLOW[kind].some((s) => s.role === r))
+                  .map((r) => (
+                    <span key={r}>
+                      <i style={{ background: ROLE_COLOR[r] }} />
+                      {tr(ROLE_TEXT[r].en, ROLE_TEXT[r].tl, ROLE_TEXT[r].zh)}
+                    </span>
+                  ))}
+              </div>
+            )}
+
             <div className="ai-stage-bar">
               <span>{tr('Drag to turn · scroll to zoom', 'I-drag para iikot · scroll para mag-zoom')}</span>
+              {!exploded && (
+                <button
+                  type="button"
+                  className={`ai-explode-btn ai-flow-btn${showFlow ? ' is-on' : ''}`}
+                  onClick={() => setShowFlow((v) => !v)}
+                  aria-pressed={showFlow}
+                >
+                  <Wind className="w-4 h-4" aria-hidden="true" />
+                  {tr('Air path', 'Daloy ng hangin', '气流路径')}
+                </button>
+              )}
               <button
                 type="button"
                 className={`ai-explode-btn${exploded ? ' is-on' : ''}`}
@@ -485,6 +603,61 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                 </li>
               ))}
             </ol>
+
+            {/* ── Parts list: quantity + indicative price per part ── */}
+            <h3 className="ai-h3">
+              <Tag className="w-3.5 h-3.5 inline-block -mt-0.5 mr-1" aria-hidden="true" />
+              {tr('Parts in this unit · indicative prices', 'Mga piyesa · tinatayang presyo', '部件清单 · 参考价格')}
+            </h3>
+            <p className="ai-bom-lead">
+              {tr(
+                exploded
+                  ? 'Each part is labelled on the exploded model with its quantity and price. Tap a row to open how it works.'
+                  : 'Open the exploded view to see each part labelled on the model. Tap a row to open how it works.',
+                exploded
+                  ? 'May label ang bawat piyesa sa exploded model kasama ang dami at presyo. Pindutin ang linya para sa paliwanag.'
+                  : 'Buksan ang exploded view para makita ang label ng bawat piyesa. Pindutin ang linya para sa paliwanag.',
+                exploded
+                  ? '爆炸图上每个部件都标注了数量和价格。点击任一行查看工作原理。'
+                  : '打开爆炸视图即可看到每个部件的标注。点击任一行查看工作原理。',
+              )}
+            </p>
+            <ul className="ai-bom">
+              {bomRows.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    className="ai-bom-row"
+                    onClick={() => {
+                      setExploded(true);
+                      usePartGuide.getState().show({ kind, brandId: brand.id, partId: r.id, variant: target.variant });
+                    }}
+                  >
+                    <span className="ai-bom-name">{tr(r.en, r.tl)}</span>
+                    <span className="ai-bom-qty">×{r.price.qty}</span>
+                    <span className="ai-bom-price">
+                      {priceRange(r.price)}
+                      {r.price.qty > 1 && <small>{priceLineTotal(r.price)}</small>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {bomTotal.counted > 0 && (
+              <div className="ai-bom-total">
+                <span>{tr('All parts together', 'Lahat ng piyesa', '全部部件合计')}</span>
+                <strong>
+                  {peso(bomTotal.low)} – {peso(bomTotal.high)}
+                </strong>
+              </div>
+            )}
+            <p className="ai-note">
+              {tr(
+                'Mock, indicative supply-only figures for this showroom — parts only, no labour, refrigerant, brackets or delivery, and not a quotation. A real part price comes from the supplier list for your exact model; a whole new unit also usually costs far less than buying its parts one by one.',
+                'Mock at tinatayang presyo ng piyesa lamang para sa showroom na ito — walang kasamang labor, refrigerant, bracket o delivery, at hindi ito quotation. Ang totoong presyo ay galing sa supplier list ng eksaktong model; mas mura rin ang bagong unit kaysa bilhin ang piyesa isa-isa.',
+                '此处为展厅用的模拟参考价（仅部件本身），不含人工、冷媒、支架与运费，也不构成报价。实际价格以具体型号的供应商价目表为准；整机通常也远低于逐件购买部件的总和。',
+              )}
+            </p>
 
             <dl className="ai-rows">
               {rows.map(([t, d]) => (

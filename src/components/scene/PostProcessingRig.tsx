@@ -16,8 +16,10 @@ const VignetteColorGradeShader = {
     tDiffuse: { value: null as THREE.Texture | null },
     vignetteOffset: { value: 1.1 },
     vignetteDarkness: { value: 0.68 },
-    contrast: { value: 1.05 },
-    saturation: { value: 1.06 },
+    contrast: { value: 1.06 },
+    // Keep colour near-neutral: pushing saturation is what makes a 3D scene
+    // read as a cartoon rather than a photograph.
+    saturation: { value: 0.97 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;

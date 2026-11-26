@@ -7,6 +7,8 @@ export interface PartTarget {
   kind: string;
   brandId: BrandId;
   partId: string;
+  /** Capacity of the unit it came from ("1.5 HP"), for the indicative part price */
+  variant?: string;
 }
 
 interface PartGuideState {

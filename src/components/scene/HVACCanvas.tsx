@@ -159,18 +159,21 @@ function Stage1ExteriorRig({
   return (
     <>
       <color attach="background" args={['#101e36']} />
-      <fog attach="fog" args={['#1d243b', 18, 46]} />
+      {/* Aerial perspective: distant geometry washes toward the haze colour */}
+      <fog attach="fog" args={['#2a3043', 15, 44]} />
 
-      {/* Warm Golden-Hour / Dusk Lighting Rig */}
-      <ambientLight intensity={0.42} color="#cbd5e1" />
-      <hemisphereLight args={['#93c5fd', '#292524', 0.85]} />
+      {/* Warm Golden-Hour / Dusk Lighting Rig.
+          Lower ambient and a softer key give real surfaces their own shading
+          instead of the evenly-lit, flat look that reads as a cartoon. */}
+      <ambientLight intensity={0.3} color="#b8c4d4" />
+      <hemisphereLight args={['#8ea8c8', '#241e1a', 0.7]} />
 
       {/* Low-Angle Golden Hour Key Light casting long soft shadows */}
       <directionalLight
         ref={keyLightRef}
         position={[-14, 5.4, 8.5]}
-        intensity={2.95}
-        color="#ffba7a"
+        intensity={2.6}
+        color="#ffcb9b"
         castShadow={shadowsAllowed}
         shadow-mapSize-width={shadowSize}
         shadow-mapSize-height={shadowSize}
@@ -186,8 +189,8 @@ function Stage1ExteriorRig({
       />
 
       {/* Dusk Sky Fill + Cool Twilight Backlight */}
-      <directionalLight position={[10, 4.5, 6]} intensity={0.75} color="#a5b4fc" />
-      <directionalLight position={[4, 6, -10]} intensity={0.65} color="#fb923c" />
+      <directionalLight position={[10, 4.5, 6]} intensity={0.55} color="#9fb2d6" />
+      <directionalLight position={[4, 6, -10]} intensity={0.45} color="#e8915a" />
 
       <ExteriorStreetScene />
     </>

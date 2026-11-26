@@ -220,45 +220,65 @@ class Quiet extends Component<{ fallback: ReactNode; children: ReactNode }, { fa
    Carousel card + column
    ============================================================================ */
 
-function ProductCard({ def, en, hidden, onOpen }: { def: CardDef; en: boolean; hidden?: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>) => void }) {
+function ProductCard({ def, en, hidden, onOpen }: { def: CardDef; en: boolean; hidden?: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>, exploded?: boolean) => void }) {
   const rendered = useSyncExternalStore(subscribeShots, () => getShot(def.key), () => null);
-  const src = productPhoto(def.brandId, def.kind) ?? rendered;
+  const photo = productPhoto(def.brandId, def.kind);
+  const src = photo ?? rendered;
   const k = KINDS[def.kind];
   const btu = btuFromVariant(def.variant);
   const brand = BRANDS.find((b) => b.id === def.brandId)!;
+  const tab = hidden ? -1 : 0;
   return (
-    <button
-      type="button"
+    <div
       className="ph-card"
       style={{ '--ph-brand': brand.accent } as CSSProperties}
-      onClick={(e) => onOpen(def, e)}
-      tabIndex={hidden ? -1 : 0}
       aria-hidden={hidden || undefined}
-      aria-label={hidden ? undefined : `${brandName(def.brandId)} ${tr(k.labelEn, k.labelTl)}, ${def.variant}. ${tr('View in 3D with exploded parts', 'Tingnan sa 3D kasama ang mga piyesa')}`}
     >
-      <span className="ph-card-media">
-        {src ? <img src={src} alt="" decoding="async" draggable={false} /> : <span className="ph-skel" />}
-        <span className="ph-card-hover">
-          <Boxes className="w-3.5 h-3.5" aria-hidden="true" />
-          {tr('3D & parts', '3D at piyesa')}
+      <button
+        type="button"
+        className="ph-card-main"
+        onClick={(e) => onOpen(def, e)}
+        tabIndex={tab}
+        aria-label={hidden ? undefined : `${brandName(def.brandId)} ${tr(k.labelEn, k.labelTl)}, ${def.variant}. ${tr('View specs and the 3D model, assembled or exploded', 'Tingnan ang specs at 3D model, buo o exploded')}`}
+      >
+        <span className="ph-card-media">
+          {src ? <img src={src} alt="" decoding="async" draggable={false} /> : <span className="ph-skel" />}
+          {/* Honest labelling: these are our own 3D renders unless a licensed photo is supplied. */}
+          <span className="ph-card-tag">
+            {photo ? tr('Photo', 'Larawan', '实物照片') : tr('3D render', '3D render', '3D 渲染图')}
+          </span>
+          <span className="ph-card-hover">
+            <Boxes className="w-3.5 h-3.5" aria-hidden="true" />
+            {tr('View specs · 3D & parts', 'Specs · 3D at piyesa')}
+          </span>
         </span>
-      </span>
-      <span className="ph-card-body">
-        <span className="ph-card-brand">{brandName(def.brandId)}</span>
-        <span className="ph-card-name">{tr(k.labelEn, k.labelTl)}</span>
-        <span className="ph-card-meta">
-          {def.variant} · {fmt(btu)} BTU/h
-          {isInverter(def.catalogId) && def.kind !== 'window' ? <em>Inverter</em> : null}
+        <span className="ph-card-body">
+          <span className="ph-card-brand">{brandName(def.brandId)}</span>
+          <span className="ph-card-name">{tr(k.labelEn, k.labelTl)}</span>
+          <span className="ph-card-meta">
+            {def.variant} · {fmt(btu)} BTU/h
+            {isInverter(def.catalogId) && def.kind !== 'window' ? <em>Inverter</em> : null}
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      <div className="ph-card-acts">
+        <button type="button" className="ph-card-act" tabIndex={tab} onClick={(e) => onOpen(def, e)}>
+          <Maximize2 className="w-3 h-3" aria-hidden="true" />
+          {tr('View specs', 'Tingnan ang specs', '查看规格')}
+        </button>
+        <button type="button" className="ph-card-act" tabIndex={tab} onClick={(e) => onOpen(def, e, true)}>
+          <Boxes className="w-3 h-3" aria-hidden="true" />
+          {tr('Exploded', 'Exploded', '爆炸图')}
+        </button>
+      </div>
+    </div>
   );
 }
 
 /** Minimum cards in one loop copy, so a copy is always taller than the column and the loop never shows a gap. */
 const MIN_LOOP = 8;
 
-function CarouselColumn({ col, en, onOpen }: { col: ColumnDef; en: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>) => void }) {
+function CarouselColumn({ col, en, onOpen }: { col: ColumnDef; en: boolean; onOpen: (d: CardDef, e: MouseEvent<HTMLElement>, exploded?: boolean) => void }) {
   // Repeat the products until one copy is long enough, then render that copy twice for a seamless loop.
   const copy: CardDef[] = [];
   while (copy.length < Math.max(MIN_LOOP, col.cards.length)) copy.push(...col.cards);
@@ -331,12 +351,13 @@ export function ProductShowroomHero() {
     setBrandId(FEATURE_BRAND[k]);
   };
 
-  const openFromCard = useCallback((d: CardDef, e: MouseEvent<HTMLElement>) => {
+  const openFromCard = useCallback((d: CardDef, e: MouseEvent<HTMLElement>, withExplode?: boolean) => {
     const r = e.currentTarget.getBoundingClientRect();
     setInspecting({
       catalogId: d.catalogId,
       variant: d.variant,
       brandId: d.brandId,
+      exploded: withExplode,
       origin: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
     });
   }, []);
@@ -377,6 +398,13 @@ export function ProductShowroomHero() {
           </h1>
           <p className="ph-lede">
             {tr('From top-tier split-type, window, and commercial AC units to expert installation and emergency repairs, we have your comfort covered. Get high-efficiency systems backed by certified local technicians. Explore our products and book today.', 'Mula split-type, window, at commercial AC hanggang expert installation at emergency repair, sagot namin ang ginhawa mo. High-efficiency systems na may certified local technicians. Silipin ang mga produkto at mag-book ngayon.')}
+          </p>
+          <p className="ph-honest">
+            {tr(
+              'Straight answer on the pictures: every product image here is our own 3D model, rendered in your browser — not brand photography, and not the exact unit you will receive. Shapes, parts and figures are typical for the class; we confirm the real model and its data sheet with your quote.',
+              'Totoong sagot sa mga larawan: lahat ng produkto rito ay sarili naming 3D model na nire-render sa browser mo — hindi ito brand photography at hindi ito ang eksaktong unit na matatanggap mo. Karaniwan lang sa klase ang hugis, piyesa at bilang; kinukumpirma namin ang totoong model at data sheet kasama ng quote.',
+              '关于图片的实话：此处所有产品图均为我们自制的 3D 模型，在您的浏览器中实时渲染，并非品牌官方照片，也不代表您最终收到的具体机型。外形、部件与参数为该类机型的典型值；实际型号与规格书会随报价确认。',
+            )}
           </p>
         </header>
 
@@ -421,10 +449,18 @@ export function ProductShowroomHero() {
             <div className="ph-canvas">
               <Quiet fallback={featureFallback}>
                 <Suspense fallback={<div className="ph-canvas-loading" />}>
-                  <ShowroomFeature kind={kind} brandId={brandId} exploded={exploded} en={en} reduceMotion={reduce} onInteract={() => setHeld(true)} />
+                  <ShowroomFeature kind={kind} brandId={brandId} exploded={exploded} en={en} reduceMotion={reduce} onInteract={() => setHeld(true)} variant={FEATURE_VARIANT[kind]} />
                 </Suspense>
               </Quiet>
-              {exploded && <p className="ph-canvas-hint">{tr('Drag to turn · each part is labelled', 'I-drag para iikot · may label ang bawat piyesa')}</p>}
+              {exploded && (
+                <p className="ph-canvas-hint">
+                  {tr(
+                    'Drag to turn · each part is labelled with quantity and indicative price',
+                    'I-drag para iikot · may label ang bawat piyesa, may dami at tinatayang presyo',
+                    '拖动旋转 · 每个部件都标有数量与参考价格',
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="ph-feature-bar">
@@ -450,7 +486,7 @@ export function ProductShowroomHero() {
                 </button>
                 <button type="button" className="ph-act ph-act--solid" onClick={() => openFeature(exploded)}>
                   <Maximize2 className="w-4 h-4" aria-hidden="true" />
-                  {tr('Full specs', 'Buong specs')}
+                  {tr('View specs', 'Tingnan ang specs', '查看规格')}
                 </button>
               </div>
             </div>

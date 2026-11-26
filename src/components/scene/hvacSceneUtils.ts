@@ -537,3 +537,286 @@ export function createFilterMeshTexture(): THREE.CanvasTexture {
   }
   return finalizeTexture(canvas, { isSRGB: true, repeat: [4, 2], anisotropy: 4 });
 }
+
+/* ============================================================================
+   Outdoor street surfaces.
+   Real roads, pavements and lawns are never one flat colour: asphalt is a
+   speckled aggregate with worn, polished wheel tracks, concrete is panelled
+   and stained, and grass is a dense mottle with mown bands. These generators
+   give the street scene those surfaces procedurally, so no image downloads
+   are needed and the look stops reading as a toy.
+   ============================================================================ */
+
+/** Deterministic value noise, so every reload renders the same street. */
+function rng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/** Speckled asphalt with aggregate, fine cracks and polished wheel tracks. */
+export function createAsphaltMaps(): {
+  map: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+} {
+  const size = 512;
+  const albedo = document.createElement('canvas');
+  albedo.width = albedo.height = size;
+  const actx = albedo.getContext('2d')!;
+  const height = document.createElement('canvas');
+  height.width = height.height = size;
+  const hctx = height.getContext('2d')!;
+  const rough = document.createElement('canvas');
+  rough.width = rough.height = size;
+  const rctx = rough.getContext('2d')!;
+  const r = rng(20260112);
+
+  actx.fillStyle = '#20232a';
+  actx.fillRect(0, 0, size, size);
+  hctx.fillStyle = 'rgb(128,128,128)';
+  hctx.fillRect(0, 0, size, size);
+  rctx.fillStyle = 'rgb(215,215,215)'; // base: very rough
+  rctx.fillRect(0, 0, size, size);
+
+  // Aggregate: thousands of small stones of varying lightness
+  for (let i = 0; i < 26000; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const rad = 0.5 + r() * 1.9;
+    const v = 24 + r() * 64;
+    actx.fillStyle = `rgba(${v},${v + 2},${v + 6},${0.35 + r() * 0.5})`;
+    actx.beginPath();
+    actx.arc(x, y, rad, 0, Math.PI * 2);
+    actx.fill();
+
+    const hv = 110 + r() * 50;
+    hctx.fillStyle = `rgba(${hv},${hv},${hv},0.5)`;
+    hctx.beginPath();
+    hctx.arc(x, y, rad, 0, Math.PI * 2);
+    hctx.fill();
+  }
+
+  // Tar patches and oil staining
+  for (let i = 0; i < 26; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const w = 20 + r() * 90;
+    const h = 12 + r() * 60;
+    const g = actx.createRadialGradient(x, y, 0, x, y, Math.max(w, h) / 2);
+    g.addColorStop(0, `rgba(10,11,14,${0.22 + r() * 0.3})`);
+    g.addColorStop(1, 'rgba(10,11,14,0)');
+    actx.fillStyle = g;
+    actx.fillRect(x - w / 2, y - h / 2, w, h);
+  }
+
+  // Hairline cracks
+  actx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    let x = r() * size;
+    let y = r() * size;
+    actx.strokeStyle = `rgba(12,13,16,${0.3 + r() * 0.4})`;
+    hctx.strokeStyle = 'rgba(70,70,70,0.6)';
+    hctx.lineWidth = 1.5;
+    actx.beginPath();
+    hctx.beginPath();
+    actx.moveTo(x, y);
+    hctx.moveTo(x, y);
+    const steps = 6 + Math.floor(r() * 10);
+    for (let s = 0; s < steps; s++) {
+      x += (r() - 0.5) * 26;
+      y += (r() - 0.5) * 26;
+      actx.lineTo(x, y);
+      hctx.lineTo(x, y);
+    }
+    actx.stroke();
+    hctx.stroke();
+  }
+
+  // Polished wheel tracks: smoother (less rough) bands where tyres run
+  [size * 0.3, size * 0.72].forEach((cy) => {
+    const g = rctx.createLinearGradient(0, cy - 46, 0, cy + 46);
+    g.addColorStop(0, 'rgba(215,215,215,0)');
+    g.addColorStop(0.5, 'rgba(120,120,120,0.85)');
+    g.addColorStop(1, 'rgba(215,215,215,0)');
+    rctx.fillStyle = g;
+    rctx.fillRect(0, cy - 46, size, 92);
+
+    const ga = actx.createLinearGradient(0, cy - 46, 0, cy + 46);
+    ga.addColorStop(0, 'rgba(120,128,140,0)');
+    ga.addColorStop(0.5, 'rgba(120,128,140,0.1)');
+    ga.addColorStop(1, 'rgba(120,128,140,0)');
+    actx.fillStyle = ga;
+    actx.fillRect(0, cy - 46, size, 92);
+  });
+
+  return {
+    map: finalizeTexture(albedo, { isSRGB: true, repeat: [8, 1], anisotropy: 8 }),
+    roughnessMap: finalizeTexture(rough, { isSRGB: false, repeat: [8, 1], anisotropy: 8 }),
+    normalMap: heightCanvasToNormalMap(height, 1.1, { repeat: [8, 1], anisotropy: 8 }),
+  };
+}
+
+/** Panelled, stained concrete for pavements, kerbs, driveways and pads. */
+export function createConcreteMaps(baseHex = '#9aa0a6'): {
+  map: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+} {
+  const size = 512;
+  const albedo = document.createElement('canvas');
+  albedo.width = albedo.height = size;
+  const actx = albedo.getContext('2d')!;
+  const height = document.createElement('canvas');
+  height.width = height.height = size;
+  const hctx = height.getContext('2d')!;
+  const rough = document.createElement('canvas');
+  rough.width = rough.height = size;
+  const rctx = rough.getContext('2d')!;
+  const r = rng(77131);
+
+  actx.fillStyle = baseHex;
+  actx.fillRect(0, 0, size, size);
+  hctx.fillStyle = 'rgb(150,150,150)';
+  hctx.fillRect(0, 0, size, size);
+  rctx.fillStyle = 'rgb(205,205,205)';
+  rctx.fillRect(0, 0, size, size);
+
+  // Pore / trowel mottle
+  for (let i = 0; i < 20000; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const rad = 0.6 + r() * 2.4;
+    const light = r() > 0.5;
+    actx.fillStyle = light ? `rgba(255,255,255,${r() * 0.08})` : `rgba(40,44,52,${r() * 0.1})`;
+    actx.beginPath();
+    actx.arc(x, y, rad, 0, Math.PI * 2);
+    actx.fill();
+    const hv = light ? 165 : 132;
+    hctx.fillStyle = `rgba(${hv},${hv},${hv},0.35)`;
+    hctx.beginPath();
+    hctx.arc(x, y, rad, 0, Math.PI * 2);
+    hctx.fill();
+  }
+
+  // Damp / dirt staining near the edges
+  for (let i = 0; i < 18; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const rad = 30 + r() * 110;
+    const g = actx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(60,64,70,${0.05 + r() * 0.12})`);
+    g.addColorStop(1, 'rgba(60,64,70,0)');
+    actx.fillStyle = g;
+    actx.beginPath();
+    actx.arc(x, y, rad, 0, Math.PI * 2);
+    actx.fill();
+  }
+
+  // Control joints: a 2 × 2 panel grid with a dark, recessed groove
+  const panel = size / 2;
+  actx.strokeStyle = 'rgba(42,46,53,0.72)';
+  actx.lineWidth = 3;
+  hctx.strokeStyle = 'rgb(60,60,60)';
+  hctx.lineWidth = 5;
+  rctx.strokeStyle = 'rgb(240,240,240)';
+  rctx.lineWidth = 5;
+  for (let i = 0; i <= 2; i++) {
+    const at = i * panel;
+    [
+      [at, 0, at, size],
+      [0, at, size, at],
+    ].forEach(([x1, y1, x2, y2]) => {
+      [actx, hctx, rctx].forEach((c) => {
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.stroke();
+      });
+    });
+  }
+
+  return {
+    map: finalizeTexture(albedo, { isSRGB: true, repeat: [6, 1], anisotropy: 8 }),
+    roughnessMap: finalizeTexture(rough, { isSRGB: false, repeat: [6, 1], anisotropy: 8 }),
+    normalMap: heightCanvasToNormalMap(height, 0.9, { repeat: [6, 1], anisotropy: 8 }),
+  };
+}
+
+/** Dense tropical lawn: mottled blades, mown bands, dry and bare patches. */
+export function createGrassMaps(): {
+  map: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+} {
+  const size = 512;
+  const albedo = document.createElement('canvas');
+  albedo.width = albedo.height = size;
+  const actx = albedo.getContext('2d')!;
+  const height = document.createElement('canvas');
+  height.width = height.height = size;
+  const hctx = height.getContext('2d')!;
+  const r = rng(553311);
+
+  actx.fillStyle = '#2f4a2c';
+  actx.fillRect(0, 0, size, size);
+  hctx.fillStyle = 'rgb(128,128,128)';
+  hctx.fillRect(0, 0, size, size);
+
+  // Mown bands
+  for (let b = 0; b < 8; b++) {
+    actx.fillStyle = b % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)';
+    actx.fillRect(0, (b * size) / 8, size, size / 8);
+  }
+
+  // Blades
+  for (let i = 0; i < 30000; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const len = 2 + r() * 5;
+    const lean = (r() - 0.5) * 2.4;
+    const g = 70 + r() * 70;
+    actx.strokeStyle = `rgba(${Math.round(g * 0.42)},${Math.round(g)},${Math.round(g * 0.4)},${0.25 + r() * 0.5})`;
+    actx.lineWidth = 0.8 + r() * 0.7;
+    actx.beginPath();
+    actx.moveTo(x, y);
+    actx.lineTo(x + lean, y - len);
+    actx.stroke();
+
+    const hv = 110 + r() * 60;
+    hctx.strokeStyle = `rgba(${hv},${hv},${hv},0.5)`;
+    hctx.lineWidth = 1;
+    hctx.beginPath();
+    hctx.moveTo(x, y);
+    hctx.lineTo(x + lean, y - len);
+    hctx.stroke();
+  }
+
+  // Dry / bare patches
+  for (let i = 0; i < 24; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const rad = 14 + r() * 58;
+    const g = actx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(122,106,62,${0.1 + r() * 0.22})`);
+    g.addColorStop(1, 'rgba(122,106,62,0)');
+    actx.fillStyle = g;
+    actx.beginPath();
+    actx.arc(x, y, rad, 0, Math.PI * 2);
+    actx.fill();
+  }
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = roughCanvas.height = size;
+  const rc = roughCanvas.getContext('2d')!;
+  rc.fillStyle = 'rgb(235,235,235)';
+  rc.fillRect(0, 0, size, size);
+
+  return {
+    map: finalizeTexture(albedo, { isSRGB: true, repeat: [4, 3], anisotropy: 8 }),
+    roughnessMap: finalizeTexture(roughCanvas, { isSRGB: false, repeat: [4, 3], anisotropy: 4 }),
+    normalMap: heightCanvasToNormalMap(height, 1.4, { repeat: [4, 3], anisotropy: 8 }),
+  };
+}

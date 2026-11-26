@@ -1,11 +1,12 @@
 import { Bounds, OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { CalendarCheck, Cog, Lightbulb, ShieldAlert, X } from 'lucide-react';
+import { Boxes, CalendarCheck, Cog, Lightbulb, ShieldAlert, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect } from 'react';
 import { BRANDS, KINDS } from '../../data/airconBrands';
 import type { UnitKind } from '../../data/airconBrands';
 import { guideFor } from '../../data/partGuides';
+import { partPrice, priceLineTotal, priceRange } from '../../data/partPrices';
 import type { L } from '../../data/partGuides';
 import { tr } from '../../i18n/tr';
 import { useHVACStore } from '../../store/useHVACStore';
@@ -60,6 +61,8 @@ export default function PartGuideCard() {
   }, [close]);
 
   const guide = open ? guideFor(open.kind, open.partId) : null;
+  // Indicative, supply-only price and how many of this part the unit holds.
+  const price = open ? partPrice(open.kind, open.partId, open.variant) : null;
   const brand = open ? BRANDS.find((b) => b.id === open.brandId) : null;
 
   return (
@@ -90,6 +93,35 @@ export default function PartGuideCard() {
               {t(guide.name)}
             </h2>
             <p className="pg-role">{t(guide.role)}</p>
+
+            {price && (
+              <div className="pg-price">
+                <span className="pg-price-k">
+                  <Boxes className="w-3.5 h-3.5" aria-hidden="true" />
+                  {tr('In this unit', 'Sa unit na ito', '本机数量')}
+                </span>
+                <span className="pg-price-q">
+                  ×{price.qty}
+                </span>
+                <span className="pg-price-v">
+                  {priceRange(price)}
+                  <small>
+                    {price.qty > 1
+                      ? `${tr('for all', 'lahat', '合计')} ${priceLineTotal(price)}`
+                      : tr('per piece, supply only', 'kada piraso, piyesa lang', '每件，仅部件')}
+                  </small>
+                </span>
+              </div>
+            )}
+            {price && (
+              <p className="pg-price-note">
+                {tr(
+                  'Mock showroom figure: part only, no labour or refrigerant, and not a quotation.',
+                  'Mock na presyo sa showroom: piyesa lang, walang labor o refrigerant, hindi ito quotation.',
+                  '展厅模拟价：仅部件本身，不含人工或冷媒，不构成报价。',
+                )}
+              </p>
+            )}
 
             <h3 className="pg-h">
               <Cog className="w-3.5 h-3.5" aria-hidden="true" />

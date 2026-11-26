@@ -785,10 +785,138 @@ textarea:focus-visible {
 }
 .ai-explode-btn:hover { border-color: var(--ai-accent); }
 .ai-explode-btn.is-on { background: var(--ai-accent); border-color: var(--ai-accent); color: #fff; }
+/* Air-path toggle sits next to the exploded-view toggle: own colour so the two read apart */
+.ai-flow-btn { margin-left: auto; margin-right: 0; }
+.ai-flow-btn.is-on { background: rgba(125, 211, 252, 0.16); border-color: #7dd3fc; color: #e0f2fe; }
+.ai-explode-btn + .ai-explode-btn { margin-left: 0; }
+
+.ai-render-tag {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 3;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(6, 16, 31, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  font: 600 9.5px/1.4 var(--font-body);
+  pointer-events: none;
+}
+
+/* Air path: floating intake / outlet / condenser tags on the 3D model */
+.ai-flowtag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(6, 16, 31, 0.82);
+  color: #e2e8f0;
+  font: 700 9.5px/1.2 var(--font-body);
+  box-shadow: 0 6px 16px rgba(2, 6, 23, 0.5);
+  backdrop-filter: blur(4px);
+}
+.ai-flowtag i { width: 6px; height: 6px; border-radius: 999px; display: block; }
+.ai-flowkey {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.ai-flowkey span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(6, 16, 31, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+  font: 600 10px/1.3 var(--font-body);
+}
+.ai-flowkey i { width: 7px; height: 7px; border-radius: 999px; display: block; }
+
+/* Parts list with quantity + indicative price */
+.ai-bom-lead { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: #94a3b8; }
+.ai-bom { margin-top: 8px; display: grid; gap: 4px; }
+.ai-bom-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 35, 64, 0.5);
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.ai-bom-row:hover { border-color: rgba(103, 232, 249, 0.5); background: rgba(34, 211, 238, 0.07); }
+.ai-bom-name { font-size: 12.5px; font-weight: 600; color: #e2e8f0; }
+.ai-bom-qty {
+  font: 700 11px/1 var(--font-tech-mono, var(--font-body));
+  color: #e0f2fe;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.14);
+}
+.ai-bom-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ai-bom-price small { font-weight: 600; font-size: 10px; color: #7dd3fc; }
+.ai-bom-total {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  font-size: 12px;
+  color: #94a3b8;
+}
+.ai-bom-total strong { font-family: var(--font-display); font-size: 14px; color: #fff; font-variant-numeric: tabular-nums; }
 
 /* Exploded-view part labels (3D overlay) */
+.am-label-n { display: block; }
+.am-label-p {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 9px/1.1 var(--font-tech-mono, var(--font-body));
+  color: #7dd3fc;
+  letter-spacing: 0.02em;
+}
+.am-label-p em {
+  font-style: normal;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.16);
+  color: #e0f2fe;
+}
+
 .am-label {
   white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
   padding: 3px 7px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -800,6 +928,29 @@ textarea:focus-visible {
   backdrop-filter: blur(4px);
   transition: opacity 200ms ease;
 }
+
+.pg-price {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 35, 64, 0.6);
+}
+.pg-price-k { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #94a3b8; }
+.pg-price-q {
+  font: 800 12px/1 var(--font-tech-mono, var(--font-body));
+  color: #e0f2fe;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.16);
+}
+.pg-price-v { display: flex; flex-direction: column; align-items: flex-end; font-weight: 800; font-size: 13px; color: #fff; font-variant-numeric: tabular-nums; }
+.pg-price-v small { font-weight: 600; font-size: 10px; color: #7dd3fc; }
+.pg-price-note { margin-top: 6px; font-size: 10.5px; line-height: 1.45; color: #64748b; }
 
 /* ============================================================================
    PRODUCT SHOWROOM HERO (ph-) — featured 3D unit + vertical carousels
@@ -974,6 +1125,8 @@ textarea:focus-visible {
   flex-direction: column;
   width: 100%;
   text-align: left;
+  /* Resting elevation so every card lifts off the dark page */
+  box-shadow: 0 10px 22px -12px rgba(2, 6, 23, 0.9), 0 2px 6px rgba(2, 6, 23, 0.45);
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.08);
   background: linear-gradient(180deg, rgba(13, 27, 46, 0.55) 0%, rgba(10, 21, 38, 0.35) 100%);
@@ -985,7 +1138,60 @@ textarea:focus-visible {
 }
 /* The whole column wakes up when the pointer is over it; the hovered card most */
 .ph-col:hover .ph-card { opacity: 0.8; }
+.ph-card-main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+.ph-card-acts {
+  display: flex;
+  gap: 6px;
+  padding: 0 9px 9px;
+}
+.ph-card-act {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(10, 22, 40, 0.75);
+  color: #cbd5e1;
+  font: 700 10px/1 var(--font-display);
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+.ph-card-act:hover,
+.ph-card-act:focus-visible {
+  border-color: color-mix(in srgb, var(--ph-brand) 70%, transparent);
+  background: color-mix(in srgb, var(--ph-brand) 18%, rgba(10, 22, 40, 0.8));
+  color: #fff;
+}
+/* Honest badge: says whether the picture is a render or a real photo */
+.ph-card-tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(7, 17, 31, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  color: #94a3b8;
+  font: 700 8.5px/1.4 var(--font-tech-mono, var(--font-body));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .ph-card:hover,
+.ph-card:focus-within,
 .ph-card:focus-visible {
   opacity: 1;
   filter: none;
@@ -1017,6 +1223,8 @@ textarea:focus-visible {
   transition: transform 500ms var(--bp-ease);
 }
 .ph-card:hover .ph-card-media img { transform: scale(1.06); }
+.ph-card:hover .ph-card-media img,
+.ph-card:focus-within .ph-card-media img { filter: drop-shadow(0 14px 18px rgba(2, 6, 23, 0.6)); }
 @keyframes ph-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .ph-skel {
@@ -1044,6 +1252,7 @@ textarea:focus-visible {
   transition: opacity 200ms ease, transform 200ms ease;
 }
 .ph-card:hover .ph-card-hover,
+.ph-card:focus-within .ph-card-hover,
 .ph-card:focus-visible .ph-card-hover { opacity: 1; transform: none; }
 
 .ph-card-body {
@@ -1404,4 +1613,80 @@ textarea:focus-visible {
     max-height: 72vh;
   }
   .pg-figure { height: 150px; }
+}
+
+/* ============================================================================
+   HOME — ELEVATION / SHADOW PASS
+   ----------------------------------------------------------------------------
+   One shadow scale for everything on the home page, so the hero, the showroom
+   carousels, the featured unit and the marketing cards all sit on the same
+   depth ladder instead of looking pasted flat onto the background.
+   ============================================================================ */
+
+:root {
+  /* 1 — resting chips & small controls, 2 — cards, 3 — panels, 4 — the hero stage */
+  --sh-1: 0 1px 2px rgba(2, 6, 23, 0.45), 0 3px 8px -3px rgba(2, 6, 23, 0.5);
+  --sh-2: 0 4px 10px -4px rgba(2, 6, 23, 0.6), 0 14px 30px -14px rgba(2, 6, 23, 0.78);
+  --sh-3: 0 10px 24px -10px rgba(2, 6, 23, 0.7), 0 30px 64px -26px rgba(2, 6, 23, 0.88);
+  --sh-4: 0 18px 40px -16px rgba(2, 6, 23, 0.78), 0 50px 110px -40px rgba(2, 6, 23, 0.95);
+  --sh-text: 0 2px 14px rgba(2, 6, 23, 0.7), 0 1px 2px rgba(2, 6, 23, 0.55);
+  --sh-ring: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Hero / showroom header ── */
+.ph-title { text-shadow: var(--sh-text); }
+.ph-eyebrow,
+.ph-lede { text-shadow: 0 1px 10px rgba(2, 6, 23, 0.65); }
+
+/* Honest note about the product imagery */
+.ph-honest {
+  margin: 0.85rem auto 0;
+  max-width: 54rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(8, 20, 38, 0.6);
+  box-shadow: var(--sh-1), var(--sh-ring);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #94a3b8;
+  text-align: left;
+}
+
+/* ── Carousel columns & cards ── */
+.ph-col-head { text-shadow: var(--sh-text); }
+.ph-viewport { box-shadow: inset 0 14px 22px -16px rgba(2, 6, 23, 0.95), inset 0 -14px 22px -16px rgba(2, 6, 23, 0.95); }
+.ph-card:hover,
+.ph-card:focus-within,
+.ph-card:focus-visible {
+  box-shadow: var(--sh-3), 0 0 0 1px color-mix(in srgb, var(--ph-brand) 25%, transparent);
+}
+
+/* ── Featured unit stage ── */
+.ph-feature { box-shadow: var(--sh-ring), var(--sh-4); }
+.ph-feature-title { text-shadow: var(--sh-text); }
+.ph-canvas { filter: drop-shadow(0 26px 30px rgba(2, 6, 23, 0.55)); }
+.ph-act,
+.ph-brand,
+.ph-kind { box-shadow: var(--sh-1); }
+
+/* ── Home CTAs ── */
+.ph-cta-btn { box-shadow: var(--sh-2), var(--sh-ring); }
+.ph-cta-btn:hover { box-shadow: var(--sh-3), var(--sh-ring); }
+.ph-cta-btn--primary { box-shadow: var(--sh-2), 0 0 24px -6px rgba(245, 158, 11, 0.45); }
+.ph-cta-btn--primary:hover { box-shadow: var(--sh-3), 0 0 32px -6px rgba(251, 191, 36, 0.55); }
+
+/* ── Marketing blueprint cards below the hero ── */
+.bp-card { box-shadow: var(--sh-2), var(--sh-ring); }
+.bp-card:hover,
+.bp-card:focus-within { box-shadow: var(--sh-3), var(--sh-ring); }
+.bp-card--compact { box-shadow: var(--sh-1), var(--sh-ring); }
+.bp-card--compact:hover,
+.bp-card--compact:focus-within { box-shadow: var(--sh-2), var(--sh-ring); }
+.bp-faq-note { box-shadow: var(--sh-1); }
+.bp-faq-note:hover,
+.bp-faq-note[data-open='true'] { box-shadow: var(--sh-2); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .ph-honest { background: #0a1628; }
 }

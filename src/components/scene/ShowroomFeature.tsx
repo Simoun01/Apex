@@ -13,7 +13,7 @@ import type { ExplodeRef, Motion } from './airconModels';
    a podium, with an animated exploded view and part labels.
    ============================================================================ */
 
-function Featured({ kind, brandId, explodeRef, exploded, en }: { kind: UnitKind; brandId: BrandId; explodeRef: ExplodeRef; exploded: boolean; en: boolean }) {
+function Featured({ kind, brandId, explodeRef, exploded, en, variant }: { kind: UnitKind; brandId: BrandId; explodeRef: ExplodeRef; exploded: boolean; en: boolean; variant: string }) {
   const group = useRef<THREE.Group>(null);
   const t = useRef(0);
   const motion = useRef<Motion>({ speed: 0.55, target: 0.55 });
@@ -36,16 +36,16 @@ function Featured({ kind, brandId, explodeRef, exploded, en }: { kind: UnitKind;
   const guide = usePartGuide((s) => s.open);
   const interaction = useMemo(
     () => ({
-      onPick: (partId: string) => showGuide({ kind, brandId, partId }),
+      onPick: (partId: string) => showGuide({ kind, brandId, partId, variant }),
       selected: guide && guide.kind === kind ? guide.partId : null,
     }),
-    [kind, brandId, guide, showGuide],
+    [kind, brandId, guide, showGuide, variant],
   );
 
   return (
     <group ref={group} scale={base * 0.8}>
       <InteractionCtx.Provider value={interaction}>
-        <ExplodeProvider explodeRef={explodeRef} labels en={en} spread={1.9}>
+        <ExplodeProvider explodeRef={explodeRef} labels en={en} spread={1.9} kind={kind} variant={variant} prices>
           <Model brand={brand} motionRef={motion} />
         </ExplodeProvider>
       </InteractionCtx.Provider>
@@ -75,6 +75,7 @@ export default function ShowroomFeature({
   en,
   reduceMotion,
   onInteract,
+  variant,
 }: {
   kind: UnitKind;
   brandId: BrandId;
@@ -82,6 +83,8 @@ export default function ShowroomFeature({
   en: boolean;
   reduceMotion: boolean;
   onInteract: () => void;
+  /** Capacity of the featured unit ("1.5 HP"), for indicative part prices */
+  variant: string;
 }) {
   const explodeRef = useRef({ amount: 0, target: 0 });
   explodeRef.current.target = exploded ? 1 : 0;
@@ -102,7 +105,7 @@ export default function ShowroomFeature({
       <directionalLight position={[2.6, 4.2, 3.2]} intensity={1.7} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
       <directionalLight position={[-3.2, 1.6, 1.8]} intensity={0.5} color="#dbeafe" />
       <spotLight position={[0, 4.5, -2.5]} intensity={18} angle={0.5} penumbra={0.9} color={brand.accent} distance={9} />
-      <Featured key={`${kind}-${brandId}`} kind={kind} brandId={brandId} explodeRef={explodeRef} exploded={exploded} en={en} />
+      <Featured key={`${kind}-${brandId}`} kind={kind} brandId={brandId} explodeRef={explodeRef} exploded={exploded} en={en} variant={variant} />
       <Podium y={floorY} accent={brand.accent} />
       <ContactShadows position={[0, floorY + 0.002, 0]} opacity={0.6} scale={3.2} blur={2.4} far={1.8} resolution={512} />
       <OrbitControls

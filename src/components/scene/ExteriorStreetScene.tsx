@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useHVACStore } from '../../store/useHVACStore';
-import { createBrushedMetalMaps } from './hvacSceneUtils';
+import {
+  createAsphaltMaps,
+  createBrushedMetalMaps,
+  createConcreteMaps,
+  createGrassMaps,
+} from './hvacSceneUtils';
 import { CommercialBuilding, ResidentialHouse } from './StreetBuildings';
 
 const GOLDEN_HOUR_VERTEX = /* glsl */ `
@@ -22,9 +27,9 @@ const GOLDEN_HOUR_FRAGMENT = /* glsl */ `
     vec3 dir = normalize(vWorldPos);
     float h = clamp(dir.y, -0.15, 1.0);
 
-    vec3 nadir = vec3(0.04, 0.09, 0.19);
-    vec3 horizon = vec3(0.95, 0.56, 0.30);
-    vec3 midDusk = vec3(0.36, 0.25, 0.42);
+    vec3 nadir = vec3(0.05, 0.08, 0.13);
+    vec3 horizon = vec3(0.86, 0.55, 0.34);
+    vec3 midDusk = vec3(0.33, 0.26, 0.37);
     vec3 zenith = vec3(0.043, 0.122, 0.227); // #0B1F3A
 
     vec3 col = mix(nadir, horizon, smoothstep(-0.12, 0.04, h));
@@ -35,11 +40,174 @@ const GOLDEN_HOUR_FRAGMENT = /* glsl */ `
     float sunDot = max(dot(dir, normalize(uSunDir)), 0.0);
     float sunGlow = pow(sunDot, 12.0) * 0.55 + pow(sunDot, 96.0) * 0.85;
     float horizonMask = smoothstep(-0.05, 0.38, h) * (1.0 - smoothstep(0.38, 0.85, h));
-    col += vec3(1.0, 0.68, 0.34) * sunGlow * (0.45 + 0.55 * horizonMask);
+    col += vec3(1.0, 0.72, 0.42) * sunGlow * (0.4 + 0.5 * horizonMask);
+
+    // Thin haze band just above the land, the way real dusk air scatters
+    col = mix(col, vec3(0.42, 0.40, 0.44), smoothstep(0.12, -0.02, h) * 0.35);
+
+    // Dither: breaks up the banding that makes a smooth sky look like a poster
+    float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    col += (grain - 0.5) * 0.012;
 
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+
+/* ============================================================================
+   Planting.
+   Real shrubs and trees are lumpy, uneven and many-toned. A single smooth
+   dodecahedron reads as a toy, so every bush and canopy here is a cluster of
+   noise-displaced spheres in slightly different greens, sitting on a short
+   trunk or mulch ring.
+   ============================================================================ */
+
+function seeded(seed: number) {
+  let s = (seed * 2654435761) >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/** Sphere with its vertices pushed in and out, so the silhouette is irregular. */
+function useLumpyGeometry(radius: number, seed: number, amount = 0.26, detail = 1) {
+  return useMemo(() => {
+    const geo = new THREE.IcosahedronGeometry(radius, detail);
+    const pos = geo.attributes.position;
+    const rand = seeded(seed);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const n = 1 + (rand() - 0.5) * 2 * amount;
+      v.multiplyScalar(n);
+      // squash very slightly so nothing looks like a perfect ball
+      v.y *= 0.88 + rand() * 0.2;
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }, [radius, seed, amount, detail]);
+}
+
+function Lump({ radius, seed, color, position, detail = 1 }: { radius: number; seed: number; color: string; position: [number, number, number]; detail?: number }) {
+  const geo = useLumpyGeometry(radius, seed, 0.3, detail);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh geometry={geo} position={position} castShadow receiveShadow>
+      <meshStandardMaterial color={color} roughness={0.96} metalness={0} flatShading={false} />
+    </mesh>
+  );
+}
+
+const LEAF_GREENS = ['#36512f', '#2c4529', '#405f33', '#2a3d24', '#4a6b39'];
+
+/** A low garden shrub: three or four overlapping lumps over a soil ring. */
+function Shrub({ position, scale = 1, seed, quality }: { position: [number, number, number]; scale?: number; seed: number; quality: 'low' | 'medium' | 'high' }) {
+  const rand = useMemo(() => seeded(seed), [seed]);
+  const lumps = useMemo(() => {
+    const n = quality === 'low' ? 2 : quality === 'medium' ? 3 : 4;
+    return Array.from({ length: n }, (_, i) => ({
+      r: (0.2 + rand() * 0.14) * scale,
+      p: [(rand() - 0.5) * 0.34 * scale, (0.1 + rand() * 0.16) * scale, (rand() - 0.5) * 0.3 * scale] as [number, number, number],
+      c: LEAF_GREENS[Math.floor(rand() * LEAF_GREENS.length)],
+      s: seed + i * 977,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, scale, quality]);
+
+  return (
+    <group position={position}>
+      {/* mulch / soil ring, so the planting meets the ground instead of floating */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} receiveShadow>
+        <circleGeometry args={[0.32 * scale, 16]} />
+        <meshStandardMaterial color="#3a2f26" roughness={0.98} />
+      </mesh>
+      {lumps.map((l, i) => (
+        <Lump key={i} radius={l.r} seed={l.s} color={l.c} position={l.p} detail={quality === 'high' ? 2 : 1} />
+      ))}
+    </group>
+  );
+}
+
+/** A small ornamental tree: tapered trunk, a few boughs, a clustered canopy. */
+function Tree({ position, height = 2.4, seed, quality }: { position: [number, number, number]; height?: number; seed: number; quality: 'low' | 'medium' | 'high' }) {
+  const rand = useMemo(() => seeded(seed), [seed]);
+  const canopy = useMemo(() => {
+    const n = quality === 'low' ? 2 : quality === 'medium' ? 4 : 6;
+    return Array.from({ length: n }, (_, i) => ({
+      r: height * (0.2 + rand() * 0.14),
+      p: [(rand() - 0.5) * height * 0.5, height * (0.72 + rand() * 0.26), (rand() - 0.5) * height * 0.45] as [number, number, number],
+      c: LEAF_GREENS[Math.floor(rand() * LEAF_GREENS.length)],
+      s: seed + i * 613,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, height, quality]);
+
+  return (
+    <group position={position}>
+      <mesh position={[0, height * 0.38, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[height * 0.035, height * 0.062, height * 0.78, quality === 'low' ? 5 : 8]} />
+        <meshStandardMaterial color="#4a3a2c" roughness={0.95} />
+      </mesh>
+      {quality !== 'low' &&
+        [0.5, -0.7].map((a, i) => (
+          <mesh key={i} position={[Math.sin(a) * height * 0.12, height * 0.66, Math.cos(a) * height * 0.1]} rotation={[0.4 * (i ? -1 : 1), a, 0.5 * (i ? 1 : -1)]} castShadow>
+            <cylinderGeometry args={[height * 0.016, height * 0.03, height * 0.3, 5]} />
+            <meshStandardMaterial color="#4a3a2c" roughness={0.95} />
+          </mesh>
+        ))}
+      {canopy.map((c, i) => (
+        <Lump key={i} radius={c.r} seed={c.s} color={c.c} position={c.p} detail={quality === 'high' ? 2 : 1} />
+      ))}
+    </group>
+  );
+}
+
+/** Concrete utility pole with a transformer and sagging service drops. */
+function UtilityPole({ x, z, seed, quality, span }: { x: number; z: number; seed: number; quality: 'low' | 'medium' | 'high'; span: number }) {
+  const h = 6.2;
+  const wires = useMemo(() => {
+    if (quality === 'low' || span <= 0) return [];
+    const rand = seeded(seed);
+    // Catenary-ish sag between this pole and the next one along the street.
+    return [0, 1, 2].map((i) => {
+      const y = h - 0.35 - i * 0.26;
+      const sag = 0.34 + rand() * 0.16;
+      const zo = (i - 1) * 0.16;
+      const pts: THREE.Vector3[] = [];
+      for (let t = 0; t <= 10; t++) {
+        const u = t / 10;
+        pts.push(new THREE.Vector3(x + u * span, y - Math.sin(u * Math.PI) * sag, z + zo));
+      }
+      return new THREE.CatmullRomCurve3(pts);
+    });
+  }, [x, z, seed, quality, span]);
+
+  return (
+    <group>
+      <mesh position={[x, h / 2, z]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.08, 0.13, h, quality === 'low' ? 6 : 10]} />
+        <meshStandardMaterial color="#8d9299" roughness={0.93} />
+      </mesh>
+      {/* cross-arm */}
+      <mesh position={[x, h - 0.3, z]} castShadow>
+        <boxGeometry args={[0.1, 0.08, 1.5]} />
+        <meshStandardMaterial color="#6b5a47" roughness={0.9} />
+      </mesh>
+      {/* transformer can */}
+      <mesh position={[x - 0.22, h - 1.15, z]} castShadow>
+        <cylinderGeometry args={[0.17, 0.17, 0.52, quality === 'low' ? 6 : 12]} />
+        <meshStandardMaterial color="#9aa2ab" roughness={0.62} metalness={0.35} />
+      </mesh>
+      {wires.map((curve, i) => (
+        <mesh key={i}>
+          <tubeGeometry args={[curve, quality === 'high' ? 14 : 8, 0.012, 4, false]} />
+          <meshStandardMaterial color="#141820" roughness={0.85} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 
 /**
  * Faint animated heat-shimmer wisps above outdoor condenser units.
@@ -189,21 +357,21 @@ function ResidentialFenceInstanced() {
     <group>
       <instancedMesh ref={postRef} args={[undefined, undefined, posts.length]} castShadow receiveShadow>
         <boxGeometry args={[0.1, 1.04, 0.1]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.82} metalness={0.1} />
+        <meshStandardMaterial color="#aeb2b7" roughness={0.95} metalness={0} />
       </instancedMesh>
       {/* Front concrete plinth + metal rails */}
       <mesh position={[-6.4, 0.16, 1.45]} castShadow receiveShadow>
         <boxGeometry args={[2.5, 0.32, 0.12]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.88} />
+        <meshStandardMaterial color="#9ba0a6" roughness={0.96} />
       </mesh>
       <mesh position={[-2.2, 0.16, 1.45]} castShadow receiveShadow>
         <boxGeometry args={[2.5, 0.32, 0.12]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.88} />
+        <meshStandardMaterial color="#9ba0a6" roughness={0.96} />
       </mesh>
       {/* Steel gate leaves */}
       <mesh position={[-4.65, 0.52, 1.45]} castShadow>
         <boxGeometry args={[0.78, 0.92, 0.04]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.42} metalness={0.72} />
+        <meshStandardMaterial color="#232a33" roughness={0.52} metalness={0.68} />
       </mesh>
       <mesh position={[-3.82, 0.52, 1.45]} castShadow>
         <boxGeometry args={[0.78, 0.92, 0.04]} />
@@ -263,7 +431,7 @@ function CommercialCondenserRowInstanced({
       {/* Concrete equipment pad */}
       <mesh position={[1.42, 0.08, -1.62]} receiveShadow castShadow>
         <boxGeometry args={[0.75, 0.16, 3.35]} />
-        <meshStandardMaterial color="#64748b" roughness={0.9} />
+        <meshStandardMaterial color="#7b8089" roughness={0.97} />
       </mesh>
 
       <instancedMesh ref={bodyRef} args={[undefined, undefined, positions.length]} castShadow receiveShadow>
@@ -352,6 +520,11 @@ export function ExteriorStreetScene() {
   const enterExperience = useHVACStore((s) => s.enterExperience);
 
   const metalMaps = useMemo(() => createBrushedMetalMaps(), []);
+  // Procedural outdoor surfaces: speckled asphalt, panelled concrete, mottled lawn.
+  const asphalt = useMemo(() => createAsphaltMaps(), []);
+  const walkway = useMemo(() => createConcreteMaps('#9aa0a6'), []);
+  const pad = useMemo(() => createConcreteMaps('#7e858d'), []);
+  const grass = useMemo(() => createGrassMaps(), []);
 
   useEffect(() => {
     const aniso = quality === 'high' ? 8 : quality === 'medium' ? 4 : 1;
@@ -375,8 +548,13 @@ export function ExteriorStreetScene() {
       metalMaps.roughnessMap.dispose();
       metalMaps.bumpMap.dispose();
       metalMaps.normalMap.dispose();
+      [asphalt, walkway, pad, grass].forEach((t) => {
+        t.map.dispose();
+        t.roughnessMap.dispose();
+        t.normalMap.dispose();
+      });
     };
-  }, [gl, metalMaps]);
+  }, [gl, metalMaps, asphalt, walkway, pad, grass]);
 
   const handleBuildingHover = (target: 'residential' | 'commercial' | null, e?: ThreeEvent<PointerEvent>) => {
     e?.stopPropagation();
@@ -404,47 +582,94 @@ export function ExteriorStreetScene() {
         />
       </mesh>
 
-      {/* Subtle distant horizon tree silhouettes & barangay roofline depth */}
+      {/* Distant barangay tree line: clustered canopies, hazed back by the fog */}
       {(quality === 'low'
         ? []
         : quality === 'medium'
           ? [-15, -6, 6.5, 16]
           : [-15, -10.5, -6, 0.2, 6.5, 11.5, 16]
       ).map((x, idx) => (
-        <mesh key={idx} position={[x, 1.3 + (idx % 3) * 0.45, -11 - (idx % 2) * 2]}>
-          <dodecahedronGeometry args={[1.6 + (idx % 2) * 0.45, 0]} />
-          <meshStandardMaterial color="#18273c" roughness={0.95} />
-        </mesh>
+        <group key={idx} position={[x, 0, -11 - (idx % 2) * 2]}>
+          <Tree position={[0, 0, 0]} height={3.4 + (idx % 3) * 0.7} seed={9001 + idx * 37} quality={quality} />
+        </group>
       ))}
 
-      {/* Ground Base & Suburban Road */}
+      {/* Ground Base: damp earth / unpaved shoulder */}
       <mesh position={[0, -0.02, -1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[52, 36]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.92} />
+        <meshStandardMaterial
+          map={pad.map}
+          roughnessMap={pad.roughnessMap}
+          normalMap={pad.normalMap}
+          normalScale={new THREE.Vector2(0.6, 0.6)}
+          color="#3d4049"
+          roughness={1}
+        />
       </mesh>
 
-      {/* Asphalt Road */}
+      {/* Asphalt Road: aggregate, cracks and polished wheel tracks */}
       <mesh position={[0, 0.005, 5.8]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[46, 5.2]} />
-        <meshStandardMaterial color="#1e2430" roughness={0.86} />
+        <meshStandardMaterial
+          map={asphalt.map}
+          roughnessMap={asphalt.roughnessMap}
+          normalMap={asphalt.normalMap}
+          normalScale={new THREE.Vector2(0.9, 0.9)}
+          color="#6f737b"
+          roughness={1}
+          metalness={0}
+        />
       </mesh>
-      {/* Road Dashed Center Stripes */}
-      {[-12, -8.5, -5, -1.5, 2, 5.5, 9, 12.5].map((x) => (
+      {/* Worn dashed centre line: thermoplastic paint, scuffed and uneven */}
+      {[-12, -8.5, -5, -1.5, 2, 5.5, 9, 12.5].map((x, i) => (
         <mesh key={x} position={[x, 0.012, 5.8]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[1.7, 0.14]} />
-          <meshStandardMaterial color="#eab308" roughness={0.75} />
+          <meshStandardMaterial
+            color="#c9bb7a"
+            roughness={0.85}
+            transparent
+            opacity={0.62 + ((i * 7) % 5) * 0.05}
+            depthWrite={false}
+          />
         </mesh>
       ))}
 
-      {/* Concrete Curb & Tiled Sidewalk */}
+      {/* Concrete Kerb & Panelled Pavement */}
       <mesh position={[0, 0.06, 3.08]} receiveShadow castShadow>
         <boxGeometry args={[36, 0.12, 0.24]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.88} />
+        <meshStandardMaterial
+          map={walkway.map}
+          roughnessMap={walkway.roughnessMap}
+          normalMap={walkway.normalMap}
+          color="#b7bcc3"
+          roughness={1}
+        />
       </mesh>
       <mesh position={[0, 0.03, 2.3]} receiveShadow>
         <boxGeometry args={[36, 0.06, 1.38]} />
-        <meshStandardMaterial color="#64748b" roughness={0.84} />
+        <meshStandardMaterial
+          map={walkway.map}
+          roughnessMap={walkway.roughnessMap}
+          normalMap={walkway.normalMap}
+          normalScale={new THREE.Vector2(0.8, 0.8)}
+          color="#898f97"
+          roughness={1}
+        />
       </mesh>
+
+      {/* Overhead lines: the pole run that reads instantly as a Philippine street */}
+      {quality !== 'low' &&
+        [-12.4, -5.2, 2, 9.2, 16.4].map((x, i, arr) => (
+          <UtilityPole
+            key={x}
+            x={x}
+            z={3.35}
+            seed={4100 + i * 53}
+            quality={quality}
+            /* the last pole in the run has no next pole to string to */
+            span={i === arr.length - 1 ? 0 : arr[i + 1] - x}
+          />
+        ))}
 
       {/* Street Lamps casting warm twilight pools */}
       {[-7.2, 0, 7.2].map((x, idx) => (
@@ -476,33 +701,53 @@ export function ExteriorStreetScene() {
         onPointerOut={(e) => handleBuildingHover(null, e)}
         onClick={(e) => handleBuildingClick('residential', e)}
       >
-        {/* Bermuda lawn & driveway */}
+        {/* Bermuda lawn & concrete driveway */}
         <mesh position={[-4.2, 0.02, -1.35]} receiveShadow>
           <boxGeometry args={[7.4, 0.04, 5.8]} />
-          <meshStandardMaterial color="#2a442d" roughness={0.94} />
+          <meshStandardMaterial
+            map={grass.map}
+            roughnessMap={grass.roughnessMap}
+            normalMap={grass.normalMap}
+            normalScale={new THREE.Vector2(1.1, 1.1)}
+            color="#8fa882"
+            roughness={1}
+          />
         </mesh>
         <mesh position={[-4.2, 0.035, 0.55]} receiveShadow>
           <boxGeometry args={[1.65, 0.05, 1.9]} />
-          <meshStandardMaterial color="#78716c" roughness={0.88} />
+          <meshStandardMaterial
+            map={walkway.map}
+            roughnessMap={walkway.roughnessMap}
+            normalMap={walkway.normalMap}
+            color="#9b968f"
+            roughness={1}
+          />
         </mesh>
 
-        {/* Small Tropical Front Garden (shrubs & ornamental tree) */}
-        {[
-          [-6.45, 0.34, 0.72, 0.34],
-          [-5.85, 0.28, 0.88, 0.26],
-          [-2.35, 0.3, 0.78, 0.29],
-          [-1.85, 0.26, 0.92, 0.24],
-        ].map(([gx, gy, gz, r], i) => (
-          <mesh key={i} position={[gx, gy, gz]} castShadow receiveShadow>
-            <dodecahedronGeometry args={[r, quality === 'high' ? 1 : 0]} />
-            <meshStandardMaterial color={i % 2 === 0 ? '#365e32' : '#4a7c3f'} roughness={0.9} />
-          </mesh>
+        {/* Small tropical front garden: clustered shrubs and a young ornamental tree */}
+        {([
+          [-6.45, 0.72, 1.05],
+          [-5.85, 0.88, 0.8],
+          [-2.35, 0.78, 0.95],
+          [-1.85, 0.92, 0.72],
+        ] as [number, number, number][]).map(([gx, gz, sc], i) => (
+          <Shrub key={i} position={[gx, 0.02, gz]} scale={sc} seed={311 + i * 131} quality={quality} />
         ))}
-        {/* Flowering bougainvillea accent */}
-        <mesh position={[-6.45, 0.54, 0.72]}>
-          <sphereGeometry args={[0.14, 10, 10]} />
-          <meshStandardMaterial color="#f43f5e" roughness={0.8} />
-        </mesh>
+        {quality !== 'low' && (
+          <Tree position={[-7.1, 0.02, -0.4]} height={2.3} seed={8801} quality={quality} />
+        )}
+        {/* Flowering bougainvillea over the nearest shrub */}
+        {quality !== 'low' &&
+          ([
+            [-6.5, 0.46, 0.76],
+            [-6.36, 0.52, 0.64],
+            [-6.58, 0.38, 0.66],
+          ] as [number, number, number][]).map(([bx, by, bz], i) => (
+            <mesh key={i} position={[bx, by, bz]} castShadow>
+              <icosahedronGeometry args={[0.07 + (i % 2) * 0.02, 0]} />
+              <meshStandardMaterial color={i % 2 ? '#b8325a' : '#d1456c'} roughness={0.88} />
+            </mesh>
+          ))}
 
         {/* Residential Perimeter Fence & Gate (Instanced posts) */}
         <ResidentialFenceInstanced />
@@ -537,7 +782,14 @@ export function ExteriorStreetScene() {
         {/* Brushed Concrete Forecourt */}
         <mesh position={[4.2, 0.02, -1.35]} receiveShadow>
           <boxGeometry args={[7.4, 0.04, 5.8]} />
-          <meshStandardMaterial color="#334155" roughness={0.86} />
+          <meshStandardMaterial
+            map={pad.map}
+            roughnessMap={pad.roughnessMap}
+            normalMap={pad.normalMap}
+            normalScale={new THREE.Vector2(0.75, 0.75)}
+            color="#7c838c"
+            roughness={1}
+          />
         </mesh>
         {/* Wheel stops & ornamental planter */}
         {[3.2, 5.2].map((wx) => (
@@ -550,10 +802,7 @@ export function ExteriorStreetScene() {
           <boxGeometry args={[0.7, 0.44, 0.7]} />
           <meshStandardMaterial color="#475569" roughness={0.85} />
         </mesh>
-        <mesh position={[6.95, 0.72, 0.85]} castShadow>
-          <dodecahedronGeometry args={[0.42, quality === 'high' ? 1 : 0]} />
-          <meshStandardMaterial color="#2f5a38" roughness={0.88} />
-        </mesh>
+        <Shrub position={[6.95, 0.46, 0.85]} scale={1.35} seed={6601} quality={quality} />
 
         {/* Detailed two-storey building: concrete frame, glass storefront, retail + office interiors,
             ceiling cassettes, ducted unit and rooftop VRF. Hovering switches on x-ray. */}
