@@ -298,8 +298,22 @@ export function ResidentialHouse({ xray, quality }: { xray: boolean; quality: 'l
     const trim = X.shell(new THREE.MeshPhysicalMaterial({ color: '#f1f5f9', roughness: 0.4, clearcoat: 0.5 }));
     const gutter = X.shell(new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.5, roughness: 0.35 }));
     const frame = X.shell(new THREE.MeshStandardMaterial({ color: '#1f2937', metalness: 0.7, roughness: 0.3 }), 0.15);
+    // Dusk: the house is occupied, so the panes carry a warm interior glow.
+    // Nothing says "evening photograph" like lit windows, and it costs no
+    // lights — the emissive does the work at every quality tier.
     const glass = X.shell(
-      new THREE.MeshPhysicalMaterial({ color: '#cfe8f5', roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.32, clearcoat: 1, envMapIntensity: 1.6, depthWrite: false }),
+      new THREE.MeshPhysicalMaterial({
+        color: '#cfe8f5',
+        roughness: 0.04,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.42,
+        clearcoat: 1,
+        envMapIntensity: 1.6,
+        depthWrite: false,
+        emissive: new THREE.Color('#ffcf91'),
+        emissiveIntensity: 0.85,
+      }),
       0.06,
     );
     const ceiling = X.shell(new THREE.MeshStandardMaterial({ color: '#f8f5ef', roughness: 0.95 }), 0.0);
@@ -554,8 +568,21 @@ export function CommercialBuilding({ xray, quality }: { xray: boolean; quality: 
     const slab = X.shell(new THREE.MeshStandardMaterial({ color: '#9aa4b1', roughness: 0.85 }), 0.1);
     const spandrel = X.shell(new THREE.MeshPhysicalMaterial({ color: '#273445', roughness: 0.3, metalness: 0.5, clearcoat: 0.8 }), 0.08);
     const mullion = X.shell(new THREE.MeshStandardMaterial({ color: '#111827', metalness: 0.75, roughness: 0.28 }), 0.18);
+    // Shop lighting is cooler and brighter than the house across the street,
+    // which also helps the two buildings read as two different places.
     const glass = X.shell(
-      new THREE.MeshPhysicalMaterial({ color: '#bcd9ea', roughness: 0.03, metalness: 0.15, transparent: true, opacity: 0.3, clearcoat: 1, envMapIntensity: 1.8, depthWrite: false }),
+      new THREE.MeshPhysicalMaterial({
+        color: '#bcd9ea',
+        roughness: 0.03,
+        metalness: 0.15,
+        transparent: true,
+        opacity: 0.38,
+        clearcoat: 1,
+        envMapIntensity: 1.8,
+        depthWrite: false,
+        emissive: new THREE.Color('#dff0ff'),
+        emissiveIntensity: 0.7,
+      }),
       0.05,
     );
     const ceiling = X.shell(new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 0.95 }), 0.0);

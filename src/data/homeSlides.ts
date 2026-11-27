@@ -5,13 +5,13 @@
    auto-advancing). Every headline, sub-headline, badge and button label below
    is the wording from that page.
 
-   IMAGES — read this before adding any:
-   that page uses interior photographs behind each slide. Those photographs are
-   not in this repo, so each slide falls back to a rendered 3D studio shot of
-   the unit it talks about (see `kind` / `brandId`), over the same navy
-   gradient. To use the real photos, drop them in `public/hero/` and set
-   `photo` below, e.g. photo: '/hero/living-room.jpg'. Use landscape images,
-   about 2000 × 1200, and only images you are licensed to publish.
+   PHOTOGRAPHS — how to switch them on:
+   each slide looks for `public/hero/<slide id>.jpg` first and only falls back
+   to the rendered 3D room if that file is missing. So dropping five photos
+   named living-room.jpg, bedroom.jpg, clean-installs.jpg, lofts.jpg and
+   floor-standing.jpg into public/hero/ replaces every room with a real photo,
+   with no code change at all. See public/hero/README.md for sizes and
+   licensing. To point a slide somewhere else, set `photo` below.
    ============================================================================ */
 
 import type { BrandId, UnitKind } from './airconBrands';
@@ -26,7 +26,7 @@ export interface HomeSlide {
   /** Slide 1 sets its second line in brand blue */
   line2Accent?: boolean;
   body: string;
-  /** Optional licensed photograph; falls back to the 3D render of `kind` */
+  /** Overrides the default `/hero/<id>.jpg` lookup; falls back to the 3D room */
   photo?: string;
   /** Unit rendered behind the slide when there is no photo */
   kind: UnitKind;

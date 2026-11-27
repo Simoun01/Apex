@@ -21,8 +21,10 @@ export interface RoomShot {
   brandId: BrandId;
 }
 
-const W = 1280;
-const H = 800;
+// Rendered at full HD and a bit over, to sit beside the real photographs
+// without looking soft when the slide is shown full-bleed.
+const W = 2048;
+const H = 1152;
 
 /** Interior-photography camera: chest height, slightly wide, looking into the corner. */
 const CAMERAS: Record<RoomId, { pos: [number, number, number]; look: [number, number, number]; fov: number }> = {
@@ -61,7 +63,7 @@ function Rig({ shots, onDone }: { shots: RoomShot[]; onDone: () => void }) {
         d = requestAnimationFrame(() => {
           gl.render(scene, camera);
           try {
-            putShot(shot.key, gl.domElement.toDataURL('image/webp', 0.86));
+            putShot(shot.key, gl.domElement.toDataURL('image/webp', 0.9));
           } catch {
             /* tainted or lost context: the slide keeps its gradient */
           }
@@ -80,15 +82,18 @@ function Rig({ shots, onDone }: { shots: RoomShot[]; onDone: () => void }) {
 
   return (
     <group key={shot.key}>
-      {/* Daylight through the window, warm interior fill, ceiling spots */}
-      <hemisphereLight args={['#dceaf8', '#2a2622', 0.55]} />
-      <ambientLight intensity={0.3} color="#cfd9e6" />
+      {/* Daylight through the window, warm interior fill, ceiling spots.
+          Several soft sources rather than one hard key: interiors read as
+          photographs when the shadows are layered and none of them is black. */}
+      <hemisphereLight args={['#dceaf8', '#3a332c', 0.7]} />
+      <ambientLight intensity={0.26} color="#cfd9e6" />
       <directionalLight
         position={[-1.5, 3.4, -6]}
-        intensity={2.6}
-        color="#cfe0f2"
+        intensity={2.4}
+        color="#d6e4f4"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[4096, 4096]}
+        shadow-radius={5}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-camera-left={-6}
@@ -98,9 +103,12 @@ function Rig({ shots, onDone }: { shots: RoomShot[]; onDone: () => void }) {
         shadow-camera-near={0.5}
         shadow-camera-far={20}
       />
-      <directionalLight position={[3.5, 2.6, 3]} intensity={0.5} color="#ffd9b0" />
-      <pointLight position={[-1.5, 2.7, -1.1]} intensity={6} color="#ffe6c4" distance={6} decay={2} />
-      <pointLight position={[1.9, 2.7, -1.1]} intensity={5} color="#ffe6c4" distance={6} decay={2} />
+      {/* Bounce off the floor and the near wall, so undersides are not dead */}
+      <directionalLight position={[3.5, 2.6, 3]} intensity={0.42} color="#ffd9b0" />
+      <directionalLight position={[0, -2, 2]} intensity={0.18} color="#e8d9c6" />
+      <pointLight position={[-1.5, 2.72, -1.1]} intensity={7} color="#ffe6c4" distance={6.5} decay={2} castShadow={false} />
+      <pointLight position={[1.9, 2.72, -1.1]} intensity={6} color="#ffe6c4" distance={6.5} decay={2} castShadow={false} />
+      <pointLight position={[0.2, 2.72, 0.6]} intensity={4} color="#fff0d8" distance={5.5} decay={2} castShadow={false} />
       <HeroRoom id={shot.id} brandId={shot.brandId} />
     </group>
   );
@@ -123,11 +131,12 @@ export default function HeroRoomStudio({ shots }: { shots: RoomShot[] }) {
         gl={{ antialias: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.12;
+          gl.toneMappingExposure = 1.06;
           gl.outputColorSpace = THREE.SRGBColorSpace;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
-        <StudioEnvironment intensity={0.55} />
+        <StudioEnvironment intensity={0.78} />
         <Rig shots={pending} onDone={() => setDone(true)} />
       </Canvas>
     </div>

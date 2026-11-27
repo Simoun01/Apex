@@ -22,7 +22,7 @@ const HeroRoomStudio = lazy(() => import('../scene/HeroRoomStudio'));
    (see `photo` in src/data/homeSlides.ts), which then takes over.
    ============================================================================ */
 
-const SLIDE_MS = 7000;
+const SLIDE_MS = 2500;
 
 /* Each slide without a photo is rendered as a room: the part of the house the
    slide is about, with the unit installed in it. */
@@ -32,11 +32,30 @@ const HERO_SHOTS: RoomShot[] = HOME_SLIDES.filter((s) => !s.photo).map((s) => ({
   brandId: s.brandId,
 }));
 
+/* Photo first, render second.
+   Each slide tries a real photograph at `public/hero/<slide id>.jpg` (or the
+   explicit `photo` path set on the slide). If that file is not there — or
+   fails to load — the slide silently falls back to the rendered room, so the
+   hero is never blank and photos can be dropped in without touching code. */
 function SlideArt({ slideId, photo }: { slideId: string; photo?: string }) {
   const rendered = useSyncExternalStore(subscribeShots, () => getShot(`heroroom-${slideId}`), () => null);
-  const src = photo ?? rendered;
-  if (!src) return <span className="hs-render" aria-hidden="true" />;
-  return <img className="hs-photo" src={src} alt="" decoding="async" draggable={false} />;
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const candidate = photo ?? `/hero/${slideId}.jpg`;
+
+  if (!photoFailed) {
+    return (
+      <img
+        className="hs-photo"
+        src={candidate}
+        alt=""
+        decoding="async"
+        draggable={false}
+        onError={() => setPhotoFailed(true)}
+      />
+    );
+  }
+  if (!rendered) return <span className="hs-render" aria-hidden="true" />;
+  return <img className="hs-photo" src={rendered} alt="" decoding="async" draggable={false} />;
 }
 
 export function HomeHeroSlider() {

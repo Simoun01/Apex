@@ -17,6 +17,8 @@
    ============================================================================ */
 
 export const PRODUCT_PHOTOS: Partial<Record<string, string>> = {
+  // Real photograph supplied by Apex — the floor-standing tower in a living room.
+  'mitsubishi-floor': '/products/mitsubishi-floor.jpg',
   // 'daikin-wall': '/products/daikin-wall.webp',
 };
 

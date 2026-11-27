@@ -888,3 +888,33 @@ export function createBrickMaps(): {
     normalMap: heightCanvasToNormalMap(height, 1.6, { repeat: [2, 1], anisotropy: 8 }),
   };
 }
+
+/**
+ * Soft radial falloff, used as a ground-shadow or light-pool decal.
+ * These read at every quality tier, including the one where real-time shadows
+ * are switched off, so buildings and lamps still sit on the ground instead of
+ * floating on it.
+ */
+export function createRadialFalloffTexture(
+  inner = 'rgba(0,0,0,0.55)',
+  outer = 'rgba(0,0,0,0)',
+  stopAt = 0.52,
+): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, inner);
+    g.addColorStop(stopAt, inner.replace(/[\d.]+\)$/, '0.28)'));
+    g.addColorStop(1, outer);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}

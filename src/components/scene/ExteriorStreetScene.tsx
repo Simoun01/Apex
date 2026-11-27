@@ -7,6 +7,7 @@ import {
   createBrushedMetalMaps,
   createConcreteMaps,
   createGrassMaps,
+  createRadialFalloffTexture,
 } from './hvacSceneUtils';
 import { CommercialBuilding, ResidentialHouse } from './StreetBuildings';
 
@@ -52,6 +53,26 @@ const GOLDEN_HOUR_FRAGMENT = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+
+/** Soft dark patch on the ground: anchors a volume even with shadows off. */
+function GroundShadow({ at, size, opacity = 0.5, tex }: { at: [number, number, number]; size: [number, number]; opacity?: number; tex: THREE.CanvasTexture }) {
+  return (
+    <mesh position={at} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
+      <planeGeometry args={size} />
+      <meshBasicMaterial map={tex} transparent opacity={opacity} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
+/** Warm pool of lamplight on the pavement, additive so it reads at dusk. */
+function LightPool({ at, size, opacity = 0.5, tex }: { at: [number, number, number]; size: [number, number]; opacity?: number; tex: THREE.CanvasTexture }) {
+  return (
+    <mesh position={at} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+      <planeGeometry args={size} />
+      <meshBasicMaterial map={tex} transparent opacity={opacity} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+    </mesh>
+  );
+}
 
 /* ============================================================================
    Planting.
@@ -528,14 +549,30 @@ export function ExteriorStreetScene() {
   const walkway = useMemo(() => createConcreteMaps('#9aa0a6'), []);
   const pad = useMemo(() => createConcreteMaps('#7e858d'), []);
   const grass = useMemo(() => createGrassMaps(), []);
+  // Decals: a dark falloff for grounding volumes, a warm one for lamplight.
+  const shadowTex = useMemo(() => createRadialFalloffTexture('rgba(2,6,16,0.62)', 'rgba(2,6,16,0)', 0.46), []);
+  const glowTex = useMemo(() => createRadialFalloffTexture('rgba(255,186,110,0.5)', 'rgba(255,186,110,0)', 0.3), []);
 
   useEffect(() => {
-    const aniso = quality === 'high' ? 8 : quality === 'medium' ? 4 : 1;
+    const aniso = quality === 'high' ? 8 : quality === 'medium' ? 4 : 2;
     [metalMaps.map, metalMaps.roughnessMap, metalMaps.bumpMap, metalMaps.normalMap].forEach((tex) => {
       tex.anisotropy = aniso;
       tex.needsUpdate = true;
     });
-  }, [quality, metalMaps]);
+    // Tile density per surface: the defaults are tuned for small props, and a
+    // 46 m road stretched over 8 repeats reads as a smear from eye level.
+    const tile = (set: { map: THREE.Texture; roughnessMap: THREE.Texture; normalMap: THREE.Texture }, x: number, y: number) => {
+      [set.map, set.roughnessMap, set.normalMap].forEach((tex) => {
+        tex.repeat.set(x, y);
+        tex.anisotropy = Math.max(aniso, 4);
+        tex.needsUpdate = true;
+      });
+    };
+    tile(asphalt, 16, 1.8);
+    tile(walkway, 12, 1);
+    tile(pad, 14, 10);
+    tile(grass, 6, 5);
+  }, [quality, metalMaps, asphalt, walkway, pad, grass]);
 
   const skyUniforms = useMemo(
     () => ({
@@ -556,8 +593,10 @@ export function ExteriorStreetScene() {
         t.roughnessMap.dispose();
         t.normalMap.dispose();
       });
+      shadowTex.dispose();
+      glowTex.dispose();
     };
-  }, [gl, metalMaps, asphalt, walkway, pad, grass]);
+  }, [gl, metalMaps, asphalt, walkway, pad, grass, shadowTex, glowTex]);
 
   const handleBuildingHover = (target: 'residential' | 'commercial' | null, e?: ThreeEvent<PointerEvent>) => {
     e?.stopPropagation();
@@ -587,7 +626,7 @@ export function ExteriorStreetScene() {
 
       {/* Distant barangay tree line: clustered canopies, hazed back by the fog */}
       {(quality === 'low'
-        ? []
+        ? [-13, 13]
         : quality === 'medium'
           ? [-15, -6, 6.5, 16]
           : [-15, -10.5, -6, 0.2, 6.5, 11.5, 16]
@@ -692,6 +731,9 @@ export function ExteriorStreetScene() {
           {(quality === 'high' || (quality === 'medium' && idx === 1)) && (
             <pointLight position={[0, 3.4, 0.45]} color="#fdba74" intensity={1.8} distance={7.5} decay={2} />
           )}
+          {/* The pool of light on the pavement, drawn at every quality tier */}
+          <LightPool at={[0, 0.075, 0.5]} size={[5.2, 5.2]} opacity={0.5} tex={glowTex} />
+          <GroundShadow at={[0, 0.05, 0]} size={[0.75, 0.75]} opacity={0.6} tex={shadowTex} />
         </group>
       ))}
 
@@ -752,6 +794,9 @@ export function ExteriorStreetScene() {
             </mesh>
           ))}
 
+        {/* Grounding shadow under the house and its footprint */}
+        <GroundShadow at={[-4.2, 0.045, -1.5]} size={[8.2, 6.4]} opacity={0.62} tex={shadowTex} />
+
         {/* Residential Perimeter Fence & Gate (Instanced posts) */}
         <ResidentialFenceInstanced />
 
@@ -806,6 +851,9 @@ export function ExteriorStreetScene() {
           <meshStandardMaterial color="#475569" roughness={0.85} />
         </mesh>
         <Shrub position={[6.95, 0.46, 0.85]} scale={1.35} seed={6601} quality={quality} />
+
+        {/* Grounding shadow under the commercial block */}
+        <GroundShadow at={[4.3, 0.045, -1.6]} size={[7.6, 6.2]} opacity={0.68} tex={shadowTex} />
 
         {/* Detailed two-storey building: concrete frame, glass storefront, retail + office interiors,
             ceiling cassettes, ducted unit and rooftop VRF. Hovering switches on x-ray. */}

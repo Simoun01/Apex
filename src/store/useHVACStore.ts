@@ -169,7 +169,40 @@ interface HVACState {
 }
 
 /** Every visitor starts on Low graphics (fast on any device); they can raise it in Settings. */
-const detectInitialQuality = (): QualityTier => 'low';
+/**
+ * Pick the starting graphics tier from what the device can actually do.
+ *
+ * This used to return 'low' for everybody, which switched off shadows, ambient
+ * occlusion, bloom and colour grading for every visitor — the scene rendered
+ * as flat untextured volumes no matter how much detail the models carried.
+ * Now a capable desktop starts on 'high', mid-range hardware on 'medium', and
+ * phones or weak GPUs still start on 'low'. The settings panel overrides it.
+ */
+const detectInitialQuality = (): QualityTier => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'medium';
+
+  // Someone who asked for less motion probably wants less GPU burn too.
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 'low';
+
+  const ua = navigator.userAgent || '';
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const mobile = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(ua) || coarse;
+  const cores = navigator.hardwareConcurrency ?? 4;
+  // deviceMemory is Chromium-only; treat an absent value as "unknown, assume ok".
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+  const dpr = window.devicePixelRatio || 1;
+  const px = window.screen?.width ? window.screen.width * window.screen.height * dpr * dpr : 0;
+
+  if (mobile) {
+    // A recent phone handles the middle tier; older ones stay on low.
+    return cores >= 8 && mem >= 6 ? 'medium' : 'low';
+  }
+  if (cores <= 2 || mem <= 2) return 'low';
+  // Very high pixel counts (5K/6K panels) cost more than the GPU gains.
+  if (cores >= 8 && mem >= 8 && px < 20e6) return 'high';
+  if (cores >= 4 && mem >= 4) return 'medium';
+  return 'low';
+};
 
 const detectReducedMotion = (): boolean => {
   if (typeof window === 'undefined') return false;
