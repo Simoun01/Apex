@@ -516,6 +516,9 @@ export function ExteriorStreetScene() {
   const { gl } = useThree();
   const quality = useHVACStore((s) => s.quality);
   const hoveredHomeBuilding = useHVACStore((s) => s.hoveredHomeBuilding);
+  // Which side the pointer is on: the camera walks there, and that building
+  // lights up, so the two read as two separate places rather than one row.
+  const homeFocus = useHVACStore((s) => s.homeFocus);
   const setHoveredHomeBuilding = useHVACStore((s) => s.setHoveredHomeBuilding);
   const enterExperience = useHVACStore((s) => s.enterExperience);
 
@@ -763,7 +766,7 @@ export function ExteriorStreetScene() {
 
         {/* Cyan Highlight Rim when Residential CTA / Building is Hovered */}
         <BuildingHoverRim
-          active={hoveredHomeBuilding === 'residential'}
+          active={hoveredHomeBuilding === 'residential' || homeFocus === 'residential'}
           color="#22D3EE"
           position={[-4.2, 1.9, -1.75]}
           size={[5.4, 3.9, 4.3]}
@@ -823,7 +826,7 @@ export function ExteriorStreetScene() {
 
         {/* Amber Highlight Rim when Commercial CTA / Building is Hovered */}
         <BuildingHoverRim
-          active={hoveredHomeBuilding === 'commercial'}
+          active={hoveredHomeBuilding === 'commercial' || homeFocus === 'commercial'}
           color="#F97316"
           position={[4.3, 3.45, -1.85]}
           size={[5.5, 6.95, 4.35]}

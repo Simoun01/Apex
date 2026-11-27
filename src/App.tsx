@@ -25,7 +25,6 @@
 import { Component, ErrorInfo, ReactNode, Suspense, lazy, useEffect } from 'react';
 import { DesktopHud } from './components/ui/DesktopHud';
 import { HomeHeroOverlay } from './components/ui/HomeHeroOverlay';
-import { BuildingsSection } from './components/ui/BuildingsSection';
 import { HomeHeroSlider } from './components/ui/HomeHeroSlider';
 import { OurProductsSection } from './components/ui/OurProductsSection';
 import { HomeMarketingSections } from './components/ui/HomeMarketingSections';
@@ -218,9 +217,6 @@ export default function App() {
             <ProductShowroomHero />
           </>
         )}
-
-        {/* Section header for the live 3D street underneath */}
-        {stage === 'home' && <BuildingsSection />}
 
         <div
           id="explore-3d"

@@ -54,15 +54,12 @@ export function HomeHeroOverlay() {
             <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
           </p>
 
-          {/* Styled like a heading, but the Residential & Commercial section
-              above the canvas owns the real <h2>, so this stays a paragraph
-              instead of adding a second heading at the same level. */}
-          <p
+          <h2
             className="font-display font-extrabold tracking-tight text-white text-balance mx-auto max-w-3xl leading-[1.1]"
             style={{ fontSize: 'clamp(1.75rem, 3.85vw, 3.15rem)' }}
           >
             {tr('Aircon Repair, Cleaning & Installation in Pampanga', 'Aircon Repair, Cleaning & Installation sa Pampanga')}
-          </p>
+          </h2>
 
           <p className="text-xs sm:text-sm md:text-[15px] text-slate-100 max-w-[45rem] mx-auto leading-relaxed font-normal">
             {tr('Explore a Filipino home split-type setup or a two-storey commercial HVAC building in real-time 3D before booking your free Pampanga site assessment.', 'Silipin ang 3D residential split-type aircon o commercial HVAC building bago magpa-book ng libreng site assessment sa Pampanga.')}

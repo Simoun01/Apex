@@ -123,6 +123,9 @@ interface HVACState {
 
   // Actions
   setHoveredHomeBuilding: (target: Audience | null) => void;
+  /** Which side of the street the pointer is over: steers the eye-level home camera */
+  homeFocus: Audience | null;
+  setHomeFocus: (target: Audience | null) => void;
   setTransitionVeil: (opacity: number) => void;
   enterExperience: (
     audience: Audience,
@@ -239,6 +242,8 @@ export const useHVACStore = create<HVACState>((set, get) => ({
   whyApexOpen: false,
 
   setHoveredHomeBuilding: (hoveredHomeBuilding) => set({ hoveredHomeBuilding }),
+  homeFocus: null,
+  setHomeFocus: (homeFocus) => set((st) => (st.homeFocus === homeFocus ? st : { homeFocus })),
   setTransitionVeil: (transitionVeil) => set({ transitionVeil }),
 
   enterExperience: (audience, opts) => {

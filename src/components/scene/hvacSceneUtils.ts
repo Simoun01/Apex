@@ -820,3 +820,71 @@ export function createGrassMaps(): {
     normalMap: heightCanvasToNormalMap(height, 1.4, { repeat: [4, 3], anisotropy: 8 }),
   };
 }
+
+/** Interior brick accent wall: running bond, mortar joints, per-brick colour variation. */
+export function createBrickMaps(): {
+  map: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+} {
+  const size = 512;
+  const albedo = document.createElement('canvas');
+  albedo.width = albedo.height = size;
+  const actx = albedo.getContext('2d')!;
+  const height = document.createElement('canvas');
+  height.width = height.height = size;
+  const hctx = height.getContext('2d')!;
+  const rough = document.createElement('canvas');
+  rough.width = rough.height = size;
+  const rctx = rough.getContext('2d')!;
+  const r = rng(90210);
+
+  // Mortar
+  actx.fillStyle = '#b9ac97';
+  actx.fillRect(0, 0, size, size);
+  hctx.fillStyle = 'rgb(70,70,70)';
+  hctx.fillRect(0, 0, size, size);
+  rctx.fillStyle = 'rgb(240,240,240)';
+  rctx.fillRect(0, 0, size, size);
+
+  const rows = 12;
+  const bh = size / rows;
+  const bw = size / 5;
+  const joint = 3.2;
+
+  for (let row = 0; row < rows; row++) {
+    const offset = row % 2 ? bw / 2 : 0;
+    for (let col = -1; col < 6; col++) {
+      const x = col * bw + offset;
+      const y = row * bh;
+      // Warm sandstone brick, each one its own shade
+      const base = 150 + r() * 55;
+      const g = base - 18 - r() * 16;
+      const b = base - 58 - r() * 22;
+      actx.fillStyle = `rgb(${Math.round(base)},${Math.round(g)},${Math.round(b)})`;
+      actx.fillRect(x + joint, y + joint, bw - joint * 2, bh - joint * 2);
+
+      const hv = 150 + r() * 40;
+      hctx.fillStyle = `rgb(${Math.round(hv)},${Math.round(hv)},${Math.round(hv)})`;
+      hctx.fillRect(x + joint, y + joint, bw - joint * 2, bh - joint * 2);
+
+      const rv = 180 + r() * 50;
+      rctx.fillStyle = `rgb(${Math.round(rv)},${Math.round(rv)},${Math.round(rv)})`;
+      rctx.fillRect(x + joint, y + joint, bw - joint * 2, bh - joint * 2);
+
+      // Pitting and chipped edges
+      for (let k = 0; k < 26; k++) {
+        const px = x + joint + r() * (bw - joint * 2);
+        const py = y + joint + r() * (bh - joint * 2);
+        actx.fillStyle = r() > 0.5 ? `rgba(255,255,255,${r() * 0.12})` : `rgba(60,40,26,${r() * 0.16})`;
+        actx.fillRect(px, py, 1 + r() * 2.5, 1 + r() * 2);
+      }
+    }
+  }
+
+  return {
+    map: finalizeTexture(albedo, { isSRGB: true, repeat: [2, 1], anisotropy: 8 }),
+    roughnessMap: finalizeTexture(rough, { isSRGB: false, repeat: [2, 1], anisotropy: 8 }),
+    normalMap: heightCanvasToNormalMap(height, 1.6, { repeat: [2, 1], anisotropy: 8 }),
+  };
+}

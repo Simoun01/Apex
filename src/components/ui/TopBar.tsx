@@ -104,7 +104,7 @@ export function TopBar() {
             <a href="#services" className="hover:text-white transition-colors whitespace-nowrap">
               {tr('Services', 'Serbisyo')}
             </a>
-            <a href="#buildings" className="hover:text-white transition-colors whitespace-nowrap">
+            <a href="#explore-3d" className="hover:text-white transition-colors whitespace-nowrap">
               {tr('Residential & Commercial', 'Bahay at Negosyo', '住宅与商用')}
             </a>
             <a href="#contact" className="hover:text-white transition-colors whitespace-nowrap">

@@ -1,6 +1,6 @@
 import { Boxes, Maximize2 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { Suspense, lazy, useMemo, useState, useSyncExternalStore } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { PRODUCT_CARDS, PRODUCT_FILTERS } from '../../data/productCards';
 import type { ProductCard, ProductFilter } from '../../data/productCards';
@@ -79,6 +79,13 @@ export function OurProductsSection() {
   const setQuoteModalOpen = useHVACStore((s) => s.setQuoteModalOpen);
   const [filter, setFilter] = useState<ProductFilter>('all');
   const [inspecting, setInspecting] = useState<InspectTarget | null>(null);
+  // Card renders start after the hero's room renders, so only one off-screen
+  // WebGL context is alive at a time on weaker devices.
+  const [studioOn, setStudioOn] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setStudioOn(true), 1500);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const cards = useMemo(
     () => (filter === 'all' ? PRODUCT_CARDS : PRODUCT_CARDS.filter((c) => c.filter === filter)),
@@ -217,7 +224,7 @@ export function OurProductsSection() {
         </p>
       </div>
 
-      {CARD_SHOTS.length > 0 && (
+      {studioOn && CARD_SHOTS.length > 0 && (
         <Suspense fallback={null}>
           <ProductStudio shots={CARD_SHOTS} />
         </Suspense>

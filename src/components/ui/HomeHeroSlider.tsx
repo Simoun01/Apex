@@ -5,10 +5,11 @@ import type { CSSProperties } from 'react';
 import { HOME_SLIDES, SLIDE_CTA_PRIMARY, SLIDE_CTA_SECONDARY } from '../../data/homeSlides';
 import { useHVACStore } from '../../store/useHVACStore';
 import { getShot, subscribeShots } from '../scene/shotStore';
-import type { Shot } from '../scene/ProductStudio';
+import type { RoomShot } from '../scene/HeroRoomStudio';
+import type { RoomId } from '../scene/HeroRooms';
 import { tr } from '../../i18n/tr';
 
-const ProductStudio = lazy(() => import('../scene/ProductStudio'));
+const HeroRoomStudio = lazy(() => import('../scene/HeroRoomStudio'));
 
 /* ============================================================================
    Home hero slider.
@@ -23,23 +24,19 @@ const ProductStudio = lazy(() => import('../scene/ProductStudio'));
 
 const SLIDE_MS = 7000;
 
-/** Studio renders used as slide art, one per slide that has no photo. */
-const HERO_SHOTS: Shot[] = HOME_SLIDES.filter((s) => !s.photo).map((s) => ({
-  key: `hero-${s.id}`,
-  kind: s.kind,
+/* Each slide without a photo is rendered as a room: the part of the house the
+   slide is about, with the unit installed in it. */
+const HERO_SHOTS: RoomShot[] = HOME_SLIDES.filter((s) => !s.photo).map((s) => ({
+  key: `heroroom-${s.id}`,
+  id: s.id as RoomId,
   brandId: s.brandId,
-  yaw: s.yaw,
-  pitch: s.pitch,
 }));
 
 function SlideArt({ slideId, photo }: { slideId: string; photo?: string }) {
-  const rendered = useSyncExternalStore(subscribeShots, () => getShot(`hero-${slideId}`), () => null);
-  if (photo) return <img className="hs-photo" src={photo} alt="" decoding="async" draggable={false} />;
-  return (
-    <span className="hs-render" aria-hidden="true">
-      {rendered && <img src={rendered} alt="" decoding="async" draggable={false} />}
-    </span>
-  );
+  const rendered = useSyncExternalStore(subscribeShots, () => getShot(`heroroom-${slideId}`), () => null);
+  const src = photo ?? rendered;
+  if (!src) return <span className="hs-render" aria-hidden="true" />;
+  return <img className="hs-photo" src={src} alt="" decoding="async" draggable={false} />;
 }
 
 export function HomeHeroSlider() {
@@ -179,7 +176,7 @@ export function HomeHeroSlider() {
 
       {studioOn && HERO_SHOTS.length > 0 && (
         <Suspense fallback={null}>
-          <ProductStudio shots={HERO_SHOTS} />
+          <HeroRoomStudio shots={HERO_SHOTS} />
         </Suspense>
       )}
     </section>

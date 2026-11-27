@@ -330,9 +330,9 @@ export function ProductShowroomHero() {
 
   // Start the photo studio once the page has painted.
   useEffect(() => {
-    // Starts after the hero's own studio pass, so only one off-screen WebGL
-    // context is alive at a time on weaker devices.
-    const t = window.setTimeout(() => setStudioOn(true), 900);
+    // Last in the queue: hero rooms, then the Our Products cards, then these,
+    // so only one off-screen WebGL context is alive at a time.
+    const t = window.setTimeout(() => setStudioOn(true), 2600);
     return () => window.clearTimeout(t);
   }, []);
 

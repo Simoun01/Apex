@@ -17,10 +17,26 @@ const _spherical = new THREE.Spherical();
 const _approachPos = new THREE.Vector3();
 const _approachLook = new THREE.Vector3();
 
-const HOME_CAMERA_POS: [number, number, number] = [0, 3.45, 14.4];
-const HOME_CAMERA_TARGET: [number, number, number] = [0, 2.35, -1.2];
-const HOME_MIN_DIST = 9.0;
-const HOME_MAX_DIST = 17.0;
+/* ── Home: a man's-eye view from the street ────────────────────────────────
+   The camera stands on the pavement at eye height (about 1.7 m) rather than
+   floating above the roofs, so the two buildings are read the way a person
+   walking past would read them. Moving the pointer to the left half of the
+   scene walks the view across to the house; the right half walks it to the
+   commercial building; the middle pulls back to take in both.
+   ──────────────────────────────────────────────────────────────────────── */
+const EYE = 1.72;
+const HOME_CAMERA_POS: [number, number, number] = [0, EYE, 11.2];
+const HOME_CAMERA_TARGET: [number, number, number] = [0, 2.1, -1.4];
+const HOME_MIN_DIST = 6.5;
+const HOME_MAX_DIST = 16.0;
+
+/** Where the camera stands when the pointer picks a side. */
+const HOME_FOCUS: Record<'residential' | 'commercial', { pos: [number, number, number]; look: [number, number, number] }> = {
+  residential: { pos: [-2.6, EYE, 6.4], look: [-4.25, 1.75, -1.7] },
+  commercial: { pos: [3.1, EYE, 6.9], look: [4.3, 2.5, -1.8] },
+};
+/** Pointer fraction outside this middle band commits to a side. */
+const FOCUS_DEADZONE: [number, number] = [0.4, 0.6];
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -38,6 +54,8 @@ export function CameraRig() {
   const cameraNonce = useHVACStore((s) => s.cameraNonce);
   const cameraFlyTarget = useHVACStore((s) => s.cameraFlyTarget);
   const reduceMotion = useHVACStore((s) => s.reduceMotion);
+  const homeFocus = useHVACStore((s) => s.homeFocus);
+  const setHomeFocus = useHVACStore((s) => s.setHomeFocus);
   const markInteracted = useHVACStore((s) => s.markInteracted);
   const completeEnterExperience = useHVACStore((s) => s.completeEnterExperience);
   const setTransitionVeil = useHVACStore((s) => s.setTransitionVeil);
@@ -48,8 +66,11 @@ export function CameraRig() {
   const justCompletedEnter = useRef(false);
 
   // Home idle drift anchor in spherical coords relative to HOME_CAMERA_TARGET
-  const homeBaseSpherical = useRef(new THREE.Spherical(15.6, 1.49, 0));
+  const homeBaseSpherical = useRef(new THREE.Spherical(12.6, 1.57, 0));
   const homeClockOffset = useRef(0);
+  // Focus walk: false while the camera is still travelling to its anchor
+  const homeSettled = useRef(true);
+  const homeFocusRef = useRef<'residential' | 'commercial' | null>(null);
 
   // Entering flight state — endPos/endLook always driven by single source of truth getCameraPresetConfig
   const enterState = useRef({
@@ -188,6 +209,40 @@ export function CameraRig() {
     };
   }, [isHome, gl, camera, invalidate]);
 
+  // Pointer side → which building the view walks toward (home stage only)
+  useEffect(() => {
+    if (!isHome) {
+      setHomeFocus(null);
+      return;
+    }
+    const dom = gl.domElement;
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return; // touch drags the scene instead
+      const r = dom.getBoundingClientRect();
+      const f = (e.clientX - r.left) / Math.max(1, r.width);
+      setHomeFocus(f < FOCUS_DEADZONE[0] ? 'residential' : f > FOCUS_DEADZONE[1] ? 'commercial' : null);
+    };
+    const onLeave = () => setHomeFocus(null);
+    dom.addEventListener('pointermove', onMove, { passive: true });
+    dom.addEventListener('pointerleave', onLeave, { passive: true });
+    return () => {
+      dom.removeEventListener('pointermove', onMove);
+      dom.removeEventListener('pointerleave', onLeave);
+      setHomeFocus(null);
+    };
+  }, [isHome, gl, setHomeFocus]);
+
+  // A new side (or back to the middle) starts a fresh walk
+  useEffect(() => {
+    homeFocusRef.current = homeFocus;
+    if (stage !== 'home') return;
+    homeSettled.current = false;
+    const anchor = homeFocus ? HOME_FOCUS[homeFocus] : { pos: HOME_CAMERA_POS, look: HOME_CAMERA_TARGET };
+    _targetPos.set(...anchor.pos);
+    _targetLook.set(...anchor.look);
+    invalidate();
+  }, [homeFocus, stage, invalidate]);
+
   // Sync camera targets on stage / preset / flyToPart changes
   useEffect(() => {
     if (stage === 'home') {
@@ -200,8 +255,8 @@ export function CameraRig() {
           maxAzimuth: 0.42,
           minDist: HOME_MIN_DIST,
           maxDist: HOME_MAX_DIST,
-          minPolar: 0.92,
-          maxPolar: Math.PI / 2 - 0.08,
+          minPolar: 1.02,
+          maxPolar: Math.PI / 2 + 0.12,
         },
       );
       _targetPos.set(...HOME_CAMERA_POS);
@@ -351,8 +406,42 @@ export function CameraRig() {
       return;
     }
 
-    // 2. Stage 1 Home gentle continuous orbit & breathing dolly when idle
-    if (stage === 'home' && !reduceMotion && !isUserDragging.current) {
+    // 2a. Stage 1 Home — walk the view toward the side the pointer picked.
+    //     Held off for a moment after a drag, so steering never yanks the
+    //     camera out of a view the visitor just set by hand.
+    if (
+      stage === 'home' &&
+      !homeSettled.current &&
+      !isUserDragging.current &&
+      clock.getElapsedTime() - lastDragEndTime.current > 1.8
+    ) {
+      const anchor = homeFocusRef.current
+        ? HOME_FOCUS[homeFocusRef.current]
+        : { pos: HOME_CAMERA_POS, look: HOME_CAMERA_TARGET };
+      _targetPos.set(...anchor.pos);
+      _targetLook.set(...anchor.look);
+      const lambda = reduceMotion ? 14 : 3.1;
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, _targetPos.x, lambda, dt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, _targetPos.y, lambda, dt);
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, _targetPos.z, lambda, dt);
+      controls.target.x = THREE.MathUtils.damp(controls.target.x, _targetLook.x, lambda, dt);
+      controls.target.y = THREE.MathUtils.damp(controls.target.y, _targetLook.y, lambda, dt);
+      controls.target.z = THREE.MathUtils.damp(controls.target.z, _targetLook.z, lambda, dt);
+      controls.update();
+      invalidate();
+      if (camera.position.distanceTo(_targetPos) < 0.04 && controls.target.distanceTo(_targetLook) < 0.04) {
+        homeSettled.current = true;
+        // Re-anchor the idle drift to wherever the walk ended
+        _offset.copy(camera.position).sub(controls.target);
+        homeBaseSpherical.current.setFromVector3(_offset);
+        homeClockOffset.current = 0;
+      }
+      return;
+    }
+
+    // 2b. Stage 1 Home gentle continuous orbit & breathing dolly when idle.
+    //     Only in the wide middle view: once a side is chosen the frame holds still.
+    if (stage === 'home' && !reduceMotion && !isUserDragging.current && !homeFocusRef.current) {
       const elapsed = clock.getElapsedTime();
       if (elapsed - lastDragEndTime.current > 2.2) {
         homeClockOffset.current += dt;
@@ -365,7 +454,7 @@ export function CameraRig() {
 
         _spherical.set(
           THREE.MathUtils.clamp(base.radius + radiusOffset, HOME_MIN_DIST, HOME_MAX_DIST),
-          THREE.MathUtils.clamp(base.phi + phiOffset, 0.94, Math.PI / 2 - 0.1),
+          THREE.MathUtils.clamp(base.phi + phiOffset, 1.04, Math.PI / 2 + 0.1),
           THREE.MathUtils.clamp(base.theta + thetaOffset, -0.4, 0.4),
         );
 
