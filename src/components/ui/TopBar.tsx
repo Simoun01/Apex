@@ -19,7 +19,6 @@ import { ApexLogo } from './ApexLogo';
 
 const LANGS: { id: Language; label: string; lang: string; title: string }[] = [
   { id: 'en', label: 'EN', lang: 'en', title: 'English' },
-  { id: 'taglish', label: 'Taglish', lang: 'tl', title: 'Taglish' },
   { id: 'zh', label: '中文', lang: 'zh-Hans', title: '简体中文 (Simplified Chinese)' },
 ];
 
@@ -77,7 +76,7 @@ export function TopBar() {
             {siteConfig.brand.name}
           </div>
           <div className="hidden md:block text-[11px] text-slate-300 whitespace-nowrap mt-0.5 leading-tight">
-            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)} · {siteConfig.brand.locationLabel}
+            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)}
           </div>
         </div>
       </div>
@@ -151,7 +150,7 @@ export function TopBar() {
           </>
         )}
 
-        {/* Language switch: English / Taglish / 中文 */}
+        {/* Language switch: English / 中文 */}
         <div
           role="radiogroup"
           aria-label="Language"

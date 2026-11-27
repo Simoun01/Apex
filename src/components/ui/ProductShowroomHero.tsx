@@ -398,7 +398,7 @@ export function ProductShowroomHero() {
       <div className="relative z-10 mx-auto max-w-[1480px] px-3 sm:px-6 pt-8 sm:pt-10 pb-8">
         <header className="ph-header">
           <p className="ph-eyebrow">
-            {siteConfig.brand.name} <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
+            {siteConfig.brand.name}
           </p>
           <h2 id="showroom-heading" className="ph-title">
             {tr('Professional HVAC Services & High-Quality Aircon Products', 'Propesyonal na HVAC Services at De-kalidad na Aircon')}

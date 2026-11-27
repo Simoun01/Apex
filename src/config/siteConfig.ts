@@ -35,6 +35,16 @@ export const siteConfig = {
   },
 
   /**
+   * SOCIAL LINKS — shown in the footer.
+   * [PLACEHOLDER] Replace both URLs with your real pages before going live.
+   * WhatsApp and email are built from `contact` above, so they update with it.
+   */
+  social: {
+    facebookUrl: 'https://www.facebook.com/ApexMechanicalCoolingPH',
+    tiktokUrl: 'https://www.tiktok.com/@apexmechanicalcooling',
+  },
+
+  /**
    * PAMPANGA & CENTRAL LUZON SERVICE AREAS — Shown in the Service Area strip and Quote dropdown.
    */
   serviceAreas: [

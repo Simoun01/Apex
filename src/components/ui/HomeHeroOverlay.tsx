@@ -50,8 +50,7 @@ export function HomeHeroOverlay() {
 
         <div className="relative z-10 max-w-4xl mx-auto space-y-1.5 sm:space-y-2">
           <p className="text-xs sm:text-sm font-semibold tracking-wide text-[#67e8f9]">
-            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)}{' '}
-            <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
+            {tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)}
           </p>
 
           <h2

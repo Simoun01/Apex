@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ArrowRight,
   Building2,
+  Facebook,
   Clock,
   Droplets,
   HelpCircle,
@@ -20,6 +21,30 @@ import { HOME_FAQ_ITEMS, getFaqAnswer, getFaqQuestion } from '../../data/homeFaq
 import { ServiceMode } from '../../data/hvacData';
 import { useHVACStore } from '../../store/useHVACStore';
 import { tr } from '../../i18n/tr';
+
+/* ── Social marks ──────────────────────────────────────────────────────────
+   lucide ships Facebook and Mail but no TikTok or WhatsApp glyph, so those two
+   are drawn here in the same 24 × 24 stroke style. They sit next to a text
+   label, so they read as the right service without pretending to be the
+   official brand artwork. Drop in licensed brand SVGs if you prefer.
+   ──────────────────────────────────────────────────────────────────────── */
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M9.5 9.2a4.4 4.4 0 1 0 4.4 4.4V3.5c.7 2.3 2.6 3.9 5.1 4.1" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3.4 20.6l1.3-4.2A8.4 8.4 0 1 1 7.9 19.4l-4.5 1.2Z" />
+      <path d="M9 9.1c.3 1.8 1.9 3.5 3.8 3.9l.8-1.1 1.7.8-.3 1.5c-2.7.4-5.9-2.6-6.3-5.4l1.4-.4.9.7Z" />
+    </svg>
+  );
+}
 
 interface ServiceMarketingCard {
   id: ServiceMode;
@@ -650,15 +675,57 @@ export function HomeMarketingSections() {
         </div>
       </section>
 
-      {/* QUIET FOOTER */}
-      <footer className="border-t border-cyan-300/15 py-6 px-5 sm:px-8 text-xs text-slate-400">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <p>
-            © {new Date().getFullYear()} {siteConfig.brand.name} · {siteConfig.brand.locationLabel}
-          </p>
-          <p>
-            {tr(siteConfig.pricingDisclaimer.en, siteConfig.pricingDisclaimer.taglish)}
-          </p>
+      {/* FOOTER */}
+      <footer className="border-t border-cyan-300/15 bg-[#071325]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div className="space-y-1">
+              <p className="font-display text-base font-bold text-white">{siteConfig.brand.name}</p>
+              <p className="text-xs text-slate-400">{tr(siteConfig.brand.taglineEn, siteConfig.brand.taglineTaglish)}</p>
+            </div>
+
+            <nav aria-label={tr('Social and contact links', 'Social at contact links')} className="flex flex-wrap items-center gap-2.5">
+              <a
+                href={siteConfig.social.facebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white hover:border-[#67E8F9]/60 transition-colors"
+              >
+                <Facebook className="w-4 h-4 text-[#67E8F9]" strokeWidth={1.5} aria-hidden="true" />
+                Facebook
+              </a>
+              <a
+                href={siteConfig.social.tiktokUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white hover:border-[#67E8F9]/60 transition-colors"
+              >
+                <TikTokIcon className="w-4 h-4 text-[#67E8F9]" />
+                TikTok
+              </a>
+              <a
+                href={`https://wa.me/${siteConfig.contact.whatsappNumber}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white hover:border-[#67E8F9]/60 transition-colors"
+              >
+                <WhatsAppIcon className="w-4 h-4 text-[#67E8F9]" />
+                WhatsApp
+              </a>
+              <a
+                href={`mailto:${siteConfig.contact.email}`}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-xs font-semibold text-slate-200 hover:text-white hover:border-[#67E8F9]/60 transition-colors"
+              >
+                <Mail className="w-4 h-4 text-[#67E8F9]" strokeWidth={1.5} aria-hidden="true" />
+                {tr('Email', 'Email', '电子邮件')}
+              </a>
+            </nav>
+          </div>
+
+          <div className="mt-7 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left text-xs text-slate-400">
+            <p>© {new Date().getFullYear()} {siteConfig.brand.name}</p>
+            <p>{tr(siteConfig.pricingDisclaimer.en, siteConfig.pricingDisclaimer.taglish)}</p>
+          </div>
         </div>
       </footer>
     </div>

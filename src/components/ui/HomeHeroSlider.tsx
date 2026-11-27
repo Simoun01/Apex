@@ -1,61 +1,37 @@
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { HOME_SLIDES, SLIDE_CTA_PRIMARY, SLIDE_CTA_SECONDARY } from '../../data/homeSlides';
 import { useHVACStore } from '../../store/useHVACStore';
-import { getShot, subscribeShots } from '../scene/shotStore';
-import type { RoomShot } from '../scene/HeroRoomStudio';
-import type { RoomId } from '../scene/HeroRooms';
 import { tr } from '../../i18n/tr';
-
-const HeroRoomStudio = lazy(() => import('../scene/HeroRoomStudio'));
 
 /* ============================================================================
    Home hero slider.
-   Five auto-advancing slides, mirroring the Apex site hero: badge pill,
+   Auto-advancing photographic slides, mirroring the Apex site hero: badge pill,
    two-line display headline, supporting line, a solid and a ghost button,
    progress dashes on the left and a counter with arrows on the right.
 
-   Where that site shows an interior photograph, this one shows the rendered
-   3D unit the slide is about — until a licensed photo is set on the slide
-   (see `photo` in src/data/homeSlides.ts), which then takes over.
+   Photographs only — the 3D room renders this used to fall back to are gone.
+   Slides advance every 2.5 s and keep advancing while the pointer rests on
+   the hero; only keyboard focus or using the arrows pauses the run.
    ============================================================================ */
 
 const SLIDE_MS = 2500;
 
-/* Each slide without a photo is rendered as a room: the part of the house the
-   slide is about, with the unit installed in it. */
-const HERO_SHOTS: RoomShot[] = HOME_SLIDES.filter((s) => !s.photo).map((s) => ({
-  key: `heroroom-${s.id}`,
-  id: s.id as RoomId,
-  brandId: s.brandId,
-}));
-
-/* Photo first, render second.
-   Each slide tries a real photograph at `public/hero/<slide id>.jpg` (or the
-   explicit `photo` path set on the slide). If that file is not there — or
-   fails to load — the slide silently falls back to the rendered room, so the
-   hero is never blank and photos can be dropped in without touching code. */
-function SlideArt({ slideId, photo }: { slideId: string; photo?: string }) {
-  const rendered = useSyncExternalStore(subscribeShots, () => getShot(`heroroom-${slideId}`), () => null);
-  const [photoFailed, setPhotoFailed] = useState(false);
-  const candidate = photo ?? `/hero/${slideId}.jpg`;
-
-  if (!photoFailed) {
-    return (
-      <img
-        className="hs-photo"
-        src={candidate}
-        alt=""
-        decoding="async"
-        draggable={false}
-        onError={() => setPhotoFailed(true)}
-      />
-    );
-  }
-  if (!rendered) return <span className="hs-render" aria-hidden="true" />;
-  return <img className="hs-photo" src={rendered} alt="" decoding="async" draggable={false} />;
+/** The slide's photograph: `/hero/<slide id>.jpg` unless the slide names one. */
+function SlideArt({ slideId, photo, eager }: { slideId: string; photo?: string; eager: boolean }) {
+  return (
+    <img
+      className="hs-photo"
+      src={photo ?? `/hero/${slideId}.jpg`}
+      alt=""
+      decoding="async"
+      loading={eager ? 'eager' : 'lazy'}
+      fetchPriority={eager ? 'high' : 'auto'}
+      draggable={false}
+    />
+  );
 }
 
 export function HomeHeroSlider() {
@@ -66,7 +42,6 @@ export function HomeHeroSlider() {
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [studioOn, setStudioOn] = useState(false);
   const total = HOME_SLIDES.length;
   const rootRef = useRef<HTMLElement>(null);
 
@@ -74,18 +49,15 @@ export function HomeHeroSlider() {
   const next = useCallback(() => go(index + 1), [go, index]);
   const prev = useCallback(() => go(index - 1), [go, index]);
 
-  // Render the slide art once the page has painted.
+  /* Auto-advance. Reduced-motion does NOT stop the run — it only removes the
+     drift and cross-fade (see .hs-photo in index.css), so the slides still
+     change but nothing moves. Pausing is still available: keyboard focus holds
+     the run, and the arrows take manual control. */
   useEffect(() => {
-    const t = window.setTimeout(() => setStudioOn(true), 200);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  // Auto-advance, unless the visitor is on the hero or asked for less motion.
-  useEffect(() => {
-    if (reduce || paused) return;
+    if (paused) return;
     const t = window.setInterval(() => setIndex((i) => (i + 1) % total), SLIDE_MS);
     return () => window.clearInterval(t);
-  }, [reduce, paused, total]);
+  }, [paused, total]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowRight') {
@@ -108,8 +80,9 @@ export function HomeHeroSlider() {
       className="hs"
       aria-roledescription="carousel"
       aria-label={tr('Apex Mechanical & Cooling highlights', 'Mga highlight ng Apex Mechanical & Cooling')}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      /* Deliberately no pause on hover: the hero covers the viewport, so the
+         pointer sits on it most of the time and the run would never advance.
+         Keyboard focus still pauses it, which is what assistive use needs. */
       onFocus={() => setPaused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setPaused(false);
@@ -128,7 +101,7 @@ export function HomeHeroSlider() {
             inert={!on || undefined}
           >
             <div className="hs-art">
-              <SlideArt slideId={s.id} photo={s.photo} />
+              <SlideArt slideId={s.id} photo={s.photo} eager={i === 0} />
             </div>
             <div className="hs-scrim" aria-hidden="true" />
 
@@ -193,11 +166,6 @@ export function HomeHeroSlider() {
         </button>
       </div>
 
-      {studioOn && HERO_SHOTS.length > 0 && (
-        <Suspense fallback={null}>
-          <HeroRoomStudio shots={HERO_SHOTS} />
-        </Suspense>
-      )}
     </section>
   );
 }
