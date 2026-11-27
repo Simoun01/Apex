@@ -6,6 +6,8 @@ import { siteConfig } from '../../config/siteConfig';
 import { BRANDS, KINDS, btuFromVariant } from '../../data/airconBrands';
 import type { BrandId, UnitKind } from '../../data/airconBrands';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
+import { NEEDS_SEPARATE_OUTDOOR, SPLIT_KINDS, unitTally } from '../../data/modelParts';
+import { peso } from '../../data/partPrices';
 import { productPhoto } from '../../data/productPhotos';
 import { useHVACStore } from '../../store/useHVACStore';
 import { getShot, subscribeShots } from '../scene/shotStore';
@@ -328,7 +330,9 @@ export function ProductShowroomHero() {
 
   // Start the photo studio once the page has painted.
   useEffect(() => {
-    const t = window.setTimeout(() => setStudioOn(true), 250);
+    // Starts after the hero's own studio pass, so only one off-screen WebGL
+    // context is alive at a time on weaker devices.
+    const t = window.setTimeout(() => setStudioOn(true), 900);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -377,6 +381,9 @@ export function ProductShowroomHero() {
   const item = EQUIPMENT_CATALOG.find((e) => e.id === KIND_CATALOG[kind]);
   const featureBtu = btuFromVariant(FEATURE_VARIANT[kind]);
   const featureAccent = BRANDS.find((b) => b.id === brandId)!.accent;
+  // Complete indicative parts tally for the featured product: every part of the
+  // unit times its quantity, plus the outdoor condenser when it is a split.
+  const tally = unitTally(kind, FEATURE_VARIANT[kind]);
 
   const featureFallback = (
     <div className="ph-feature-fallback">
@@ -393,9 +400,9 @@ export function ProductShowroomHero() {
           <p className="ph-eyebrow">
             {siteConfig.brand.name} <span aria-hidden="true">·</span> {siteConfig.brand.locationLabel}
           </p>
-          <h1 id="showroom-heading" className="ph-title">
+          <h2 id="showroom-heading" className="ph-title">
             {tr('Professional HVAC Services & High-Quality Aircon Products', 'Propesyonal na HVAC Services at De-kalidad na Aircon')}
-          </h1>
+          </h2>
           <p className="ph-lede">
             {tr('From top-tier split-type, window, and commercial AC units to expert installation and emergency repairs, we have your comfort covered. Get high-efficiency systems backed by certified local technicians. Explore our products and book today.', 'Mula split-type, window, at commercial AC hanggang expert installation at emergency repair, sagot namin ang ginhawa mo. High-efficiency systems na may certified local technicians. Silipin ang mga produkto at mag-book ngayon.')}
           </p>
@@ -452,6 +459,20 @@ export function ProductShowroomHero() {
                   <ShowroomFeature kind={kind} brandId={brandId} exploded={exploded} en={en} reduceMotion={reduce} onInteract={() => setHeld(true)} variant={FEATURE_VARIANT[kind]} />
                 </Suspense>
               </Quiet>
+              {exploded && (
+                <div className="ph-tally">
+                  <span className="ph-tally-k">{tr('Complete parts tally', 'Buong tally ng piyesa', '全部部件合计')}</span>
+                  <strong>
+                    {peso(tally.low)} – {peso(tally.high)}
+                  </strong>
+                  <small>
+                    {tally.lines} {tr('part types', 'uri ng piyesa', '种部件')} · {tally.pieces} {tr('pieces', 'piraso', '件')}
+                    {SPLIT_KINDS.includes(kind) ? ` · ${tr('indoor + outdoor', 'indoor + outdoor', '室内机 + 室外机')}` : ''}
+                    {NEEDS_SEPARATE_OUTDOOR.includes(kind) ? ` · ${tr('indoor only', 'indoor lang', '仅室内机')}` : ''}
+                  </small>
+                  <em>{tr('Mock figures · parts only, not a quote', 'Mock lang · piyesa lang, hindi quote', '模拟数据 · 仅部件，非报价')}</em>
+                </div>
+              )}
               {exploded && (
                 <p className="ph-canvas-hint">
                   {tr(

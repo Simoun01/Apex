@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Accessibility,
   ArrowLeft,
+  ArrowRight,
   Building2,
   Home,
   Phone,
@@ -88,17 +89,26 @@ export function TopBar() {
             aria-label="Home page sections"
             className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-300 mr-1"
           >
+            {/* Mirrors the Apex site menu, with one deliberate swap: where that
+                site has "Portfolio", this build has no portfolio, so the slot
+                goes to the Residential & Commercial 3D buildings instead. */}
+            <a href="#top" className="text-white transition-colors whitespace-nowrap">
+              {tr('Home', 'Home')}
+            </a>
+            <a href="#why-apex" className="hover:text-white transition-colors whitespace-nowrap">
+              {tr('About Us', 'Tungkol Sa Amin')}
+            </a>
+            <a href="#products" className="hover:text-white transition-colors whitespace-nowrap">
+              {tr('Products', 'Produkto')}
+            </a>
             <a href="#services" className="hover:text-white transition-colors whitespace-nowrap">
               {tr('Services', 'Serbisyo')}
             </a>
-            <a href="#why-apex" className="hover:text-white transition-colors whitespace-nowrap">
-              {tr('Why Apex')}
+            <a href="#buildings" className="hover:text-white transition-colors whitespace-nowrap">
+              {tr('Residential & Commercial', 'Bahay at Negosyo', '住宅与商用')}
             </a>
-            <a href="#service-areas" className="hover:text-white transition-colors whitespace-nowrap">
-              {tr('Service Areas', 'Lugar')}
-            </a>
-            <a href="#faq" className="hover:text-white transition-colors whitespace-nowrap">
-              FAQ
+            <a href="#contact" className="hover:text-white transition-colors whitespace-nowrap">
+              {tr('Contact Us', 'Kontakin Kami')}
             </a>
           </nav>
         ) : (
@@ -313,9 +323,14 @@ export function TopBar() {
           type="button"
           onClick={() => setQuoteModalOpen(true)}
           aria-label="Open free aircon quote and site assessment form"
-          className="px-3 sm:px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 min-h-[38px] shadow-md cursor-pointer"
+          className={
+            isHome
+              ? 'inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-gradient-to-b from-[#3f93f7] to-[#1d6fe0] hover:from-[#5aa3f9] hover:to-[#2a7cea] border border-[#5aa3f9]/70 text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 min-h-[38px] shadow-lg cursor-pointer'
+              : 'px-3 sm:px-4 py-2 rounded-lg bg-[#F97316] hover:bg-[#ea580c] text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 min-h-[38px] shadow-md cursor-pointer'
+          }
         >
-          {tr('Get a Free Quote', 'Libreng Quote')}
+          {isHome ? tr('Book a Service', 'Mag-book ng Serbisyo', '预约服务') : tr('Get a Free Quote', 'Libreng Quote')}
+          {isHome && <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
         </button>
       </div>
     </header>

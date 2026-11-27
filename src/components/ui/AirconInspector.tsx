@@ -9,9 +9,10 @@ import * as THREE from 'three';
 import { BRANDS, CATALOG_KIND, KINDS, featuresFor, specFor } from '../../data/airconBrands';
 import type { Brand, BrandId, PartId, UnitKind } from '../../data/airconBrands';
 import { EQUIPMENT_CATALOG } from '../../data/hvacData';
-import { partPrice, partsTotal, peso, priceLineTotal, priceRange } from '../../data/partPrices';
+import { partPrice, peso, priceLineTotal, priceRange } from '../../data/partPrices';
+import { MODEL_PARTS, NEEDS_SEPARATE_OUTDOOR, SPLIT_KINDS } from '../../data/modelParts';
 import { useHVACStore } from '../../store/useHVACStore';
-import { ExplodeProvider, InteractionCtx, MODELS, MODEL_PARTS, StudioEnvironment } from '../scene/airconModels';
+import { ExplodeProvider, InteractionCtx, MODELS, StudioEnvironment } from '../scene/airconModels';
 import { usePartGuide } from '../../store/usePartGuide';
 import type { ExplodeRef, Motion, MotionRef, V3 } from '../scene/airconModels';
 import { tr } from '../../i18n/tr';
@@ -398,12 +399,45 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
     { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Fan speed (now)', 'Bilis ng fan'), value: `${fmt(rpmNow)} rpm`, sub: `${tr('step', 'level')} ${lvl}/${steps}` },
     { icon: <Gauge className="w-3.5 h-3.5" />, label: tr('Sound level', 'Ingay'), value: `${noiseNow} dBA`, sub: `${spec.noiseLow}–${spec.noiseHigh} dBA` },
   ];
-  // Parts list for the exploded view: what this model is actually built from.
-  const bom = MODEL_PARTS[kind] ?? [];
-  const bomRows = bom
-    .map((mp) => ({ ...mp, price: partPrice(kind, mp.id, target.variant)! }))
-    .filter((r) => r.price);
-  const bomTotal = partsTotal(kind, bom.map((mp) => mp.id), target.variant);
+  /* ── Complete parts tally ──────────────────────────────────────────────
+     A split system is two machines, so pricing only the indoor half would be
+     a half-truth. Wall and floor units therefore tally the indoor unit AND
+     the outdoor condenser they are paired with. Window and packaged units are
+     one box, so they tally once. Commercial indoor units (cassette, ducted)
+     need a condensing unit that this model does not show, and the panel says
+     so rather than quietly leaving it out of the total.
+     ──────────────────────────────────────────────────────────────────── */
+  const bomGroups = (() => {
+    const groups: { key: string; title: string; figureKind: string; rows: { id: string; en: string; tl: string; price: NonNullable<ReturnType<typeof partPrice>> }[] }[] = [];
+    const build = (figureKind: string, key: string, title: string) => {
+      const rows = (MODEL_PARTS[figureKind] ?? [])
+        .map((mp) => ({ ...mp, price: partPrice(figureKind, mp.id, target.variant) }))
+        .filter((r): r is typeof r & { price: NonNullable<typeof r.price> } => Boolean(r.price));
+      if (rows.length) groups.push({ key, title, figureKind, rows });
+    };
+    build(kind, 'indoor', SPLIT_KINDS.includes(kind) ? tr('Indoor unit', 'Indoor unit', '室内机') : tr('Unit', 'Unit', '机组'));
+    if (SPLIT_KINDS.includes(kind)) build('outdoor', 'outdoor', tr('Outdoor condenser', 'Outdoor condenser', '室外冷凝机'));
+    return groups;
+  })();
+
+  const groupTotal = (g: (typeof bomGroups)[number]) =>
+    g.rows.reduce(
+      (acc, r) => ({ low: acc.low + r.price.low * r.price.qty, high: acc.high + r.price.high * r.price.qty }),
+      { low: 0, high: 0 },
+    );
+
+  const bomTotal = bomGroups.reduce(
+    (acc, g) => {
+      const t = groupTotal(g);
+      return {
+        low: acc.low + t.low,
+        high: acc.high + t.high,
+        lines: acc.lines + g.rows.length,
+        pieces: acc.pieces + g.rows.reduce((n, r) => n + r.price.qty, 0),
+      };
+    },
+    { low: 0, high: 0, lines: 0, pieces: 0 },
+  );
 
   const rows: [string, string][] = [
     [spec.effUnit === 'CSPF' ? 'CSPF' : 'EER', `${spec.eff.toFixed(2)}${spec.effUnit === 'EER' ? ' W/W' : ''}`],
@@ -440,6 +474,19 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
             <span className="ai-render-tag">
               {tr('Our 3D model · illustrative, not the brand’s photo', 'Sarili naming 3D model · pang-ilustrasyon lang', '我方自制 3D 模型 · 仅作示意，非品牌照片')}
             </span>
+            {exploded && bomTotal.lines > 0 && (
+              <div className="ai-stage-tally">
+                <span>{tr('Complete parts tally', 'Buong tally ng piyesa', '全部部件合计')}</span>
+                <strong>
+                  {peso(bomTotal.low)} – {peso(bomTotal.high)}
+                </strong>
+                <small>
+                  {bomTotal.lines} {tr('part types', 'uri ng piyesa', '种部件')} · {bomTotal.pieces} {tr('pieces', 'piraso', '件')}
+                  {SPLIT_KINDS.includes(kind) ? ` · ${tr('indoor + outdoor', 'indoor + outdoor', '室内机 + 室外机')}` : ''}
+                  {NEEDS_SEPARATE_OUTDOOR.includes(kind) ? ` · ${tr('indoor only', 'indoor lang', '仅室内机')}` : ''}
+                </small>
+              </div>
+            )}
             <div ref={pinRoot} className="ai-pins" />
             <Canvas shadows resize={{ offsetSize: true }} dpr={[1, 2]} camera={{ position: narrow ? [2.1, 1.1, 3.9] : [1.5, 0.8, 2.7], fov: 36 }} gl={{ antialias: true, alpha: true }}>
               <StudioEnvironment intensity={0.9} />
@@ -622,35 +669,68 @@ export default function AirconInspector({ target, onClose }: { target: InspectTa
                   : '打开爆炸视图即可看到每个部件的标注。点击任一行查看工作原理。',
               )}
             </p>
-            <ul className="ai-bom">
-              {bomRows.map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    className="ai-bom-row"
-                    onClick={() => {
-                      setExploded(true);
-                      usePartGuide.getState().show({ kind, brandId: brand.id, partId: r.id, variant: target.variant });
-                    }}
-                  >
-                    <span className="ai-bom-name">{tr(r.en, r.tl)}</span>
-                    <span className="ai-bom-qty">×{r.price.qty}</span>
-                    <span className="ai-bom-price">
-                      {priceRange(r.price)}
-                      {r.price.qty > 1 && <small>{priceLineTotal(r.price)}</small>}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {bomTotal.counted > 0 && (
+            {bomGroups.map((g) => {
+              const t = groupTotal(g);
+              return (
+                <section key={g.key} className="ai-bom-group">
+                  {bomGroups.length > 1 && (
+                    <h4 className="ai-bom-gh">
+                      <span>{g.title}</span>
+                      <span>
+                        {peso(t.low)} – {peso(t.high)}
+                      </span>
+                    </h4>
+                  )}
+                  <ul className="ai-bom">
+                    {g.rows.map((r) => (
+                      <li key={`${g.key}-${r.id}`}>
+                        <button
+                          type="button"
+                          className="ai-bom-row"
+                          onClick={() => {
+                            if (g.key === 'indoor') setExploded(true);
+                            usePartGuide.getState().show({ kind: g.figureKind, brandId: brand.id, partId: r.id, variant: target.variant });
+                          }}
+                        >
+                          <span className="ai-bom-name">{tr(r.en, r.tl)}</span>
+                          <span className="ai-bom-qty">×{r.price.qty}</span>
+                          <span className="ai-bom-price">
+                            {priceRange(r.price)}
+                            {r.price.qty > 1 && <small>{priceLineTotal(r.price)}</small>}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+
+            {bomTotal.lines > 0 && (
               <div className="ai-bom-total">
-                <span>{tr('All parts together', 'Lahat ng piyesa', '全部部件合计')}</span>
+                <span>
+                  {tr('Complete parts tally', 'Buong tally ng piyesa', '全部部件合计')}
+                  <small>
+                    {bomTotal.lines} {tr('part types', 'uri ng piyesa', '种部件')} · {bomTotal.pieces} {tr('pieces', 'piraso', '件')}
+                    {bomGroups.length > 1 ? ` · ${tr('indoor + outdoor', 'indoor + outdoor', '室内机 + 室外机')}` : ''}
+                  </small>
+                </span>
                 <strong>
                   {peso(bomTotal.low)} – {peso(bomTotal.high)}
                 </strong>
               </div>
             )}
+
+            {NEEDS_SEPARATE_OUTDOOR.includes(kind) && (
+              <p className="ai-bom-lead">
+                {tr(
+                  'This tally covers the indoor unit only. A cassette or ducted unit also needs a matching condensing unit outside, which is quoted separately.',
+                  'Indoor unit lang ang nasa tally na ito. Kailangan pa ng katugmang condensing unit sa labas, hiwalay ang quote nito.',
+                  '此清单仅含室内机。天花机／风管机还需配套室外冷凝机组，另行报价。',
+                )}
+              </p>
+            )}
+
             <p className="ai-note">
               {tr(
                 'Mock, indicative supply-only figures for this showroom — parts only, no labour, refrigerant, brackets or delivery, and not a quotation. A real part price comes from the supplier list for your exact model; a whole new unit also usually costs far less than buying its parts one by one.',

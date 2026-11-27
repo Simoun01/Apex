@@ -25,6 +25,9 @@
 import { Component, ErrorInfo, ReactNode, Suspense, lazy, useEffect } from 'react';
 import { DesktopHud } from './components/ui/DesktopHud';
 import { HomeHeroOverlay } from './components/ui/HomeHeroOverlay';
+import { BuildingsSection } from './components/ui/BuildingsSection';
+import { HomeHeroSlider } from './components/ui/HomeHeroSlider';
+import { OurProductsSection } from './components/ui/OurProductsSection';
 import { HomeMarketingSections } from './components/ui/HomeMarketingSections';
 import { MobileSheet } from './components/ui/MobileSheet';
 import { Non3DFallback } from './components/ui/Non3DFallback';
@@ -206,8 +209,18 @@ export default function App() {
       <TopBar />
 
       <main className="relative w-full">
-        {/* Product showroom hero sits above the 3D Residential / Commercial street scene */}
-        {stage === 'home' && <ProductShowroomHero />}
+        {/* Page order mirrors the Apex site: hero slider, then Our Products,
+            then this app's own interactive 3D showroom and street scene. */}
+        {stage === 'home' && (
+          <>
+            <HomeHeroSlider />
+            <OurProductsSection />
+            <ProductShowroomHero />
+          </>
+        )}
+
+        {/* Section header for the live 3D street underneath */}
+        {stage === 'home' && <BuildingsSection />}
 
         <div
           id="explore-3d"
